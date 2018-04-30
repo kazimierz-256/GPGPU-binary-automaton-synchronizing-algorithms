@@ -14,6 +14,7 @@ namespace GPGPU.Version_1._0
     {
         private static readonly int mostProbablePowerSetCount = 1 << 13;
         private ushort[] previousVertexStatic = new ushort[mostProbablePowerSetCount];
+        private ushort[] distanceToVertexStatic = new ushort[mostProbablePowerSetCount];
         private bool[] previousLetterUsedEqualsBStatic = new bool[mostProbablePowerSetCount];
 
         public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
@@ -25,6 +26,7 @@ namespace GPGPU.Version_1._0
                         problemsToSolve[i],
                         true,
                         previousVertexStatic,
+                        distanceToVertexStatic,
                         previousLetterUsedEqualsBStatic))
                     .ToArray();
             }
@@ -33,7 +35,9 @@ namespace GPGPU.Version_1._0
                 var results = new ComputationResult[problemsToSolve.Length];
                 var reusableLengths = degreeOfParallelism;
                 var previousVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
+                var distanceToVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
                 var previousLetterUsedEqualsBReusables = Enumerable.Range(0, reusableLengths).Select(_ => new bool[mostProbablePowerSetCount]).ToArray();
+
 
 
 
@@ -73,6 +77,7 @@ namespace GPGPU.Version_1._0
                                 problem,
                                 true,
                                 previousVertexReusables[id],
+                                distanceToVertexReusables[id],
                                 previousLetterUsedEqualsBReusables[id]
                                 );
                             reusablesQueue.Enqueue(id);
@@ -91,6 +96,7 @@ namespace GPGPU.Version_1._0
             Problem problemToSolve,
             bool reuseResources = false,
             ushort[] previousVertexReusable = null,
+            ushort[] distanceToVertexReusable = null,
             bool[] previousLetterUsedEqualsBReusable = null
             )
         {
@@ -110,11 +116,11 @@ namespace GPGPU.Version_1._0
             ushort[] distanceToVertex;
             ushort[] previousVertex;
             bool[] previousLetterUsedEqualsB;
+            benchmarkTiming.Start();
+            // about 20-30% of overall computation
             bool[] isDiscovered = new bool[powerSetCount];
             isDiscovered[initialVertex] = true;
 
-            // about 15% of overall computation using single thread
-            // about 30% of overall computation using multiple threads + reusage
             if (reuseResources)
             {
                 // use whatever size is needed, they all should be consistent (of same size)
@@ -122,8 +128,9 @@ namespace GPGPU.Version_1._0
                 {
                     previousVertexReusable = new ushort[powerSetCount];
                     previousLetterUsedEqualsBReusable = new bool[powerSetCount];
+                    distanceToVertexReusable = new ushort[powerSetCount];
                 }
-                distanceToVertex = new ushort[powerSetCount];
+                distanceToVertex = distanceToVertexReusable;
                 previousVertex = previousVertexReusable;
                 previousLetterUsedEqualsB = previousLetterUsedEqualsBReusable;
             }
@@ -157,7 +164,7 @@ namespace GPGPU.Version_1._0
                 precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
                 precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
-            //benchmarkTiming.Start();
+            benchmarkTiming.Stop();
             while (!discoveredSingleton && queue.Count > 0)
             {
                 extractingBits = consideringVertex = queue.Dequeue();
@@ -165,8 +172,9 @@ namespace GPGPU.Version_1._0
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
-                //b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
-                if (consideringVertex != 0 && (consideringVertex & (consideringVertex - 1)) == 0)
+                // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
+                // note: consideringVertex cannot ever be equal to 0
+                if ((consideringVertex & (consideringVertex - 1)) == 0)
                 {
                     discoveredSingleton = true;
                     firstSingleton = consideringVertex;
@@ -199,7 +207,6 @@ namespace GPGPU.Version_1._0
                     queue.Enqueue(vertexAfterTransitionB);
                 }
             }
-            //benchmarkTiming.Stop();
 
             // finished main loop
 

@@ -26,6 +26,7 @@ namespace GPGPU
             var version = cpuSolver.GetType().Namespace;
             var csvBuilder = new StringBuilder("problemcount,cputime,gputime,cpugpucombinedtime");
             var resultsDictionary = new Dictionary<int, Dictionary<ComputationType, BenchmarkResult>>();
+            var degreeOfParallelism = 1;
 
             // in a loop check the performance of the CPU
             double dn = initialProblemSamplingCount;
@@ -34,7 +35,6 @@ namespace GPGPU
                 ;
                 n = (int)Math.Round(dn *= sizeIncrease))
             {
-                var degreeOfParallelism = 1;
 
                 var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
 
@@ -72,9 +72,16 @@ namespace GPGPU
                     problemsPerSecond = (int)Math.Round(n / computationElapsed.TotalSeconds)
                 };
 
-                Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds:F2}ms. Problems per second: {n / computationElapsed.TotalSeconds:F2}. Time per problem {computationElapsed.TotalMilliseconds / n:F5}ms");
-                Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. Time per verification {verificationElapsed.TotalMilliseconds / n:F5}ms");
-                Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, {results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWord.Length):F2} average length of a synchronizing word");
+                Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds:F2}ms. " +
+                    $"Problems per second: {n / computationElapsed.TotalSeconds:F2}. " +
+                    $"Time per problem {computationElapsed.TotalMilliseconds / n:F5}ms");
+
+                Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. " +
+                    $"Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. " +
+                    $"Time per verification {verificationElapsed.TotalMilliseconds / n:F5}ms");
+
+                Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, " +
+                    $"{results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWord.Length):F2} average length of a synchronizing word");
 
                 #region Histogram
                 var histogram = results
