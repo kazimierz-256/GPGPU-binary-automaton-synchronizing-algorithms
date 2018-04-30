@@ -34,12 +34,8 @@ namespace GPGPU
                 ;
                 n = (int)Math.Round(dn *= sizeIncrease))
             {
-                for (
-                    int degreeOfParallelism = 1;
-                    degreeOfParallelism <= Environment.ProcessorCount;
-                    degreeOfParallelism += Environment.ProcessorCount)
+                foreach (var degreeOfParallelism in new int[] { 1, 4, Environment.ProcessorCount })
                 {
-
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
 
                     watch.Start();
@@ -47,9 +43,8 @@ namespace GPGPU
                     watch.Stop();
 
                     var computationElapsed = watch.Elapsed;
-                    var fractionOfTime = results
-                        .Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
-                        / watch.Elapsed.TotalMilliseconds;
+                    var fractionOfTime = results.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
+                        / results.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
 
                     watch.Reset();
                     watch.Start();
@@ -99,7 +94,7 @@ namespace GPGPU
                     #endregion
 
                     #region Benchmark
-                    Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}% "); 
+                    Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}% ");
                     #endregion
 
                 }

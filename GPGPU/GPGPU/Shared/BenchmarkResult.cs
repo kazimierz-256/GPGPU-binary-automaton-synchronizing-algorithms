@@ -10,5 +10,6 @@ namespace GPGPU.Shared
     {
         public int problemsPerSecond;
         public TimeSpan benchmarkedTime;
+        public TimeSpan totalTime;
     }
 }
