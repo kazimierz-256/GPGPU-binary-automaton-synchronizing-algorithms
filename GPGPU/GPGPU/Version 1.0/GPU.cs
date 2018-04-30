@@ -10,7 +10,12 @@ namespace GPGPU.Version_1._0
 {
     class GPU : IComputation
     {
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism) => throw new NotImplementedException();
-        public ComputationResult ComputeOne(Problem problemToSolve) => throw new NotImplementedException();
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism) => Enumerable.Range(0, problemsToSolve.Length)
+                .Select(i => ComputeOne(problemsToSolve[i])).ToArray();
+
+        public ComputationResult ComputeOne(Problem problemToSolve)
+        {
+            return new ComputationResult();
+        }
     }
 }

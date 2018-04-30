@@ -35,29 +35,32 @@ namespace GPGPU.Version_1._0
                 var previousVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
                 var previousLetterUsedEqualsBReusables = Enumerable.Range(0, reusableLengths).Select(_ => new bool[mostProbablePowerSetCount]).ToArray();
 
+
+
+                //var n = problemsToSolve.Count();
+                //var fraction = (n + degreeOfParallelism - 1) / degreeOfParallelism;
+
+                //Parallel.For(
+                //    0,
+                //    degreeOfParallelism,
+                //    new ParallelOptions() { MaxDegreeOfParallelism = degreeOfParallelism },
+                //    i =>
+                //{
+                //    for (int j = i * fraction; j < (i + 1) * fraction && j < n; j++)
+                //    {
+                //        results[j] = ComputeOne(
+                //            problemsToSolve[j],
+                //            true,
+                //            previousVertexReusables[i],
+                //            previousLetterUsedEqualsBReusables[i]
+                //            );
+                //    }
+                //});
+                //return results;       
+
                 var reusablesQueue = new ConcurrentQueue<int>();
                 for (int i = 0; i < reusableLengths; i++)
                     reusablesQueue.Enqueue(i);
-
-                //Parallel.For(0, problemsToSolve.Length, new ParallelOptions() { MaxDegreeOfParallelism = degreeOfParallelism }, i =>
-                //{
-                //    //if (Task.CurrentId.HasValue)
-                //    //{
-                //    reusablesQueue.TryDequeue(out int id);
-                //    results[i] = ComputeOne(
-                //        problemsToSolve[i],
-                //        true,
-                //        previousVertexReusables[id],
-                //        previousLetterUsedEqualsBReusables[id]
-                //        );
-                //    reusablesQueue.Enqueue(id);
-                //    //}
-                //    //else
-                //    //{
-                //    //    results[i] = ComputeOne(problemsToSolve[i], false);
-                //    //}
-                //});
-                //return results;
                 return problemsToSolve
                     .AsParallel()
                     .WithDegreeOfParallelism(degreeOfParallelism)
@@ -82,7 +85,7 @@ namespace GPGPU.Version_1._0
             }
         }
 
-        public ComputationResult ComputeOne(Problem problemToSolve) => ComputeOne(problemToSolve);
+        public ComputationResult ComputeOne(Problem problemToSolve) => ComputeOne(problemToSolve, false);
 
         public ComputationResult ComputeOne(
             Problem problemToSolve,
@@ -154,13 +157,13 @@ namespace GPGPU.Version_1._0
                 precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
                 precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
+            //benchmarkTiming.Start();
             while (!discoveredSingleton && queue.Count > 0)
             {
                 extractingBits = consideringVertex = queue.Dequeue();
                 distanceToConsideredVertex = distanceToVertex[consideringVertex];
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
-                benchmarkTiming.Start();
                 // check for singleton existance
                 //b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                 if (consideringVertex != 0 && (consideringVertex & (consideringVertex - 1)) == 0)
@@ -178,7 +181,6 @@ namespace GPGPU.Version_1._0
                     vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[targetIndexPlusOne];
                     extractingBits >>= 1;
                 }
-                benchmarkTiming.Stop();
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
@@ -197,6 +199,7 @@ namespace GPGPU.Version_1._0
                     queue.Enqueue(vertexAfterTransitionB);
                 }
             }
+            //benchmarkTiming.Stop();
 
             // finished main loop
 
