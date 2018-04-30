@@ -25,7 +25,7 @@ namespace GPGPU
             var gpuSolver = new Version_1._0.GPU();
             var version = cpuSolver.GetType().Namespace;
             var csvBuilder = new StringBuilder("problemcount,cputime,gputime,cpugpucombinedtime");
-            var resultsDictionary = new Dictionary<int, Dictionary<ComputationType, BenchmarkResult>>();
+            var resultsDictionary = new List<ComputationResult>();
             var degreeOfParallelism = 1;
 
             // in a loop check the performance of the CPU
@@ -60,14 +60,7 @@ namespace GPGPU
 
                 var verificationElapsed = watch.Elapsed;
 
-                if (!resultsDictionary.ContainsKey(n))
-                {
-                    resultsDictionary.Add(n, new Dictionary<ComputationType, BenchmarkResult>());
-                }
-                resultsDictionary[n][ComputationType.CPU_Parallel] = new BenchmarkResult
-                {
-                    problemsPerSecond = (int)Math.Round(n / computationElapsed.TotalSeconds)
-                };
+                resultsDictionary.AddRange(results);
 
                 Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds:F2}ms. " +
                     $"Problems per second: {n / computationElapsed.TotalSeconds:F2}. " +
@@ -98,9 +91,9 @@ namespace GPGPU
                 #endregion
 
                 #region Benchmark
-                Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}% ");
+                Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}%");
                 #endregion
-
+                Console.WriteLine(results.Average(result => result.queueBreadth));
 
                 Console.WriteLine();
                 Console.WriteLine();

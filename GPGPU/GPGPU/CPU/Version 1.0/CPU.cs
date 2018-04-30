@@ -104,10 +104,7 @@ namespace GPGPU.Version_1._0
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
 
-            var result = new ComputationResult
-            {
-                benchmarkResult = new BenchmarkResult()
-            };
+
             var n = problemToSolve.size;
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
@@ -140,9 +137,10 @@ namespace GPGPU.Version_1._0
                 previousVertex = new ushort[powerSetCount];
                 previousLetterUsedEqualsB = new bool[powerSetCount];
             }
+            benchmarkTiming.Stop();
 
 
-            var queue = new Queue<ushort>(n * 2);
+            var queue = new Queue<ushort>(n * 4);
             queue.Enqueue(initialVertex);
 
             var discoveredSingleton = false;
@@ -162,10 +160,13 @@ namespace GPGPU.Version_1._0
                 precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
                 precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
-            benchmarkTiming.Stop();
 
+            var maximumBreadth = 0;
             while (queue.Count > 0)
             {
+                if (queue.Count > maximumBreadth)
+                    maximumBreadth = queue.Count;
+
                 extractingBits = consideringVertex = queue.Dequeue();
                 distanceToConsideredVertex = distanceToVertex[consideringVertex];
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
@@ -173,7 +174,7 @@ namespace GPGPU.Version_1._0
                 // check for singleton existance
                 // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                 // note: consideringVertex cannot ever be equal to 0
-                if ((consideringVertex & (consideringVertex - 1)) == 0)
+                if (0 == (consideringVertex & (consideringVertex - 1)))
                 {
                     discoveredSingleton = true;
                     firstSingleton = consideringVertex;
@@ -208,6 +209,13 @@ namespace GPGPU.Version_1._0
             }
 
             // finished main loop
+
+            var result = new ComputationResult()
+            {
+                benchmarkResult = new BenchmarkResult(),
+                computationType = ComputationType.CPU_Serial,
+                queueBreadth = maximumBreadth,
+            };
 
             if (discoveredSingleton)
             {

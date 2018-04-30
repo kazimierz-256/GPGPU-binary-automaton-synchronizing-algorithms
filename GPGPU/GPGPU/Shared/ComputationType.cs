@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Shared
 {
-    enum ComputationType
+    public enum ComputationType
     {
         CPU_Parallel, CPU_Serial, GPU, CPU_GPU_Combined
     }
