@@ -1,5 +1,6 @@
 ﻿using GPGPU.Result_veryfier;
 using GPGPU.Shared;
+using LinqStatistics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -34,9 +35,9 @@ namespace GPGPU
                 n = (int)Math.Round(dn *= sizeIncrease))
             {
                 for (
-                    int degreeOfParallelism = Environment.ProcessorCount;
-                    degreeOfParallelism > 0;
-                    degreeOfParallelism--)
+                    int degreeOfParallelism = 1;
+                    degreeOfParallelism <= Environment.ProcessorCount;
+                    degreeOfParallelism += Environment.ProcessorCount - 1)
                 {
 
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
@@ -69,6 +70,21 @@ namespace GPGPU
 
                     Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds}ms. Problems per second: {n / computationElapsed.TotalSeconds}. Time per problem {computationElapsed.TotalMilliseconds / n}ms");
                     Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds}ms. Verifications per second: {n / verificationElapsed.TotalSeconds}. Time per verification {verificationElapsed.TotalMilliseconds / n}ms");
+                    Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100}% synchronizability, {results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWord.Length)} average length of a synchronizing word");
+
+                    var histogram = results
+                        .Where(result => result.isSynchronizable)
+                        .Histogram(30, result => result.shortestSynchronizingWord.Length);
+
+                    foreach (var bin in histogram)
+                    {
+                        Console.Write($"{Math.Round(bin.RepresentativeValue)}: ");
+                        for (int i = 0; i < bin.Count * 800 / n || (i == 0 && bin.Count > 0); i++)
+                        {
+                            Console.Write("-");
+                        }
+                        Console.WriteLine();
+                    }
                     Console.WriteLine();
                 }
                 Console.WriteLine();

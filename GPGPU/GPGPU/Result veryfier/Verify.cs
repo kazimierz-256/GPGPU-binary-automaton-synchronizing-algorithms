@@ -11,7 +11,7 @@ namespace GPGPU.Result_veryfier
     {
         public static bool VerifyValidityOfSynchronizingWord(
             Problem problem,
-            ComputationResult result,
+            ComputationResult computationResult,
             int degreeOfParallelism)
         {
             var initialQuery = Enumerable.Range(0, problem.size);
@@ -20,11 +20,24 @@ namespace GPGPU.Result_veryfier
             {
                 initialQuery = Enumerable.Range(0, problem.size).AsParallel().WithDegreeOfParallelism(degreeOfParallelism);
             }
-            // add check for equality, not the quality of being distinct
+
+            //var partialResult = initialQuery.Select(letter =>
+            //{
+            //    int resultingLetter = letter;
+            //    foreach (var isB in computationalResult.shortestSynchronizingWord)
+            //    {
+            //        resultingLetter = isB ? problem.stateTransitioningMatrixB[resultingLetter]
+            //        : problem.stateTransitioningMatrixA[resultingLetter];
+            //    }
+            //    return resultingLetter;
+            //});
+            //var firstElement = partialResult.First();
+            //return partialResult.All(result => result == firstElement);
+
             return initialQuery.Select(letter =>
             {
                 int resultingLetter = letter;
-                foreach (var isB in result.shortestSynchronizingWord)
+                foreach (var isB in computationResult.shortestSynchronizingWord)
                 {
                     resultingLetter = isB ? problem.stateTransitioningMatrixB[resultingLetter]
                     : problem.stateTransitioningMatrixA[resultingLetter];

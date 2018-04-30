@@ -138,13 +138,12 @@ namespace GPGPU.Version_1._0
 
                     int wordLength = distanceToVertex[firstSingleton];
                     int currentVertex = firstSingleton;
-                    var resultingWordEqualsB = new bool[wordLength];
+                    result.shortestSynchronizingWord = new bool[wordLength];
                     for (int i = wordLength - 1; i >= 0; i--)
                     {
-                        resultingWordEqualsB[i] = previousLetterUsedEqualsB[currentVertex];
+                        result.shortestSynchronizingWord[i] = previousLetterUsedEqualsB[currentVertex];
                         currentVertex = previousVertex[currentVertex];
                     }
-                    result.shortestSynchronizingWord = resultingWordEqualsB;
                 }
             }
             else
