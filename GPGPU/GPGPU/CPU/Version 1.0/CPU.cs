@@ -151,8 +151,8 @@ namespace GPGPU.Version_1._0
             ushort vertexAfterTransitionB;
             int targetIndexPlusOne;
             ushort extractingBits;
-            ushort firstSingleton = 0;
-            ushort firstSingletonDistance = 0;
+            ushort firstDiscoveredSingleton = 0;
+            ushort shortestWordLength = 0;
             ushort distanceToConsideredVertex;
 
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
@@ -170,8 +170,8 @@ namespace GPGPU.Version_1._0
                 //if (queue.Count > maximumBreadth)
                 //    maximumBreadth = queue.Count;
 
-                extractingBits = consideringVertex = vertexQueue[(vertexQueueReadIndex++) % n];
-                distanceToConsideredVertex = distanceQueue[(distanceQueueReadIndex++) % n];
+                extractingBits = consideringVertex = vertexQueue[(vertexQueueReadIndex++) % powerSetCount];
+                distanceToConsideredVertex = distanceQueue[(distanceQueueReadIndex++) % powerSetCount];
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
@@ -180,8 +180,8 @@ namespace GPGPU.Version_1._0
                 if (0 == (consideringVertex & (consideringVertex - 1)))
                 {
                     discoveredSingleton = true;
-                    firstSingleton = consideringVertex;
-                    firstSingletonDistance = distanceToConsideredVertex;
+                    firstDiscoveredSingleton = consideringVertex;
+                    shortestWordLength = distanceToConsideredVertex;
                     break;
                 }
                 // watch out for the index range in the for loop
@@ -196,19 +196,19 @@ namespace GPGPU.Version_1._0
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
-                    distanceQueue[distanceQueuePutIndex++] = ((ushort)(distanceToConsideredVertex + 1));
+                    distanceQueue[(distanceQueuePutIndex++) % powerSetCount] = ((ushort)(distanceToConsideredVertex + 1));
                     previousVertex[vertexAfterTransitionA] = consideringVertex;
                     isDiscovered[vertexAfterTransitionA] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
-                    vertexQueue[vertexQueuePutIndex++] = (vertexAfterTransitionA);
+                    vertexQueue[(vertexQueuePutIndex++) % powerSetCount] = (vertexAfterTransitionA);
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
-                    distanceQueue[(distanceQueuePutIndex++) % n] = ((ushort)(distanceToConsideredVertex + 1));
+                    distanceQueue[(distanceQueuePutIndex++) % powerSetCount] = ((ushort)(distanceToConsideredVertex + 1));
                     previousVertex[vertexAfterTransitionB] = consideringVertex;
                     isDiscovered[vertexAfterTransitionB] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
-                    vertexQueue[(vertexQueuePutIndex++) % n] = (vertexAfterTransitionB);
+                    vertexQueue[(vertexQueuePutIndex++) % powerSetCount] = (vertexAfterTransitionB);
                 }
             }
 
@@ -226,7 +226,7 @@ namespace GPGPU.Version_1._0
             if (discoveredSingleton)
             {
                 // watch out for off by one error!
-                if (firstSingletonDistance > maximumPermissibleWordLength)
+                if (shortestWordLength > maximumPermissibleWordLength)
                 {
                     throw new Exception("Cerny conjecture is false");
                 }
@@ -235,10 +235,9 @@ namespace GPGPU.Version_1._0
                     // everything is fine
                     result.isSynchronizable = true;
 
-                    int wordLength = firstSingletonDistance;
-                    int currentVertex = firstSingleton;
-                    result.shortestSynchronizingWord = new bool[wordLength];
-                    for (int i = wordLength - 1; i >= 0; i--)
+                    int currentVertex = firstDiscoveredSingleton;
+                    result.shortestSynchronizingWord = new bool[shortestWordLength];
+                    for (int i = shortestWordLength - 1; i >= 0; i--)
                     {
                         result.shortestSynchronizingWord[i] = previousLetterUsedEqualsB[currentVertex];
                         currentVertex = previousVertex[currentVertex];
