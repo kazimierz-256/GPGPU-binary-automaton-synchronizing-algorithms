@@ -37,7 +37,7 @@ namespace GPGPU
                 for (
                     int degreeOfParallelism = 1;
                     degreeOfParallelism <= Environment.ProcessorCount;
-                    degreeOfParallelism += Environment.ProcessorCount - 1)
+                    degreeOfParallelism += Environment.ProcessorCount)
                 {
 
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
@@ -47,11 +47,20 @@ namespace GPGPU
                     watch.Stop();
 
                     var computationElapsed = watch.Elapsed;
+                    var fractionOfTime = results
+                        .Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
+                        / watch.Elapsed.TotalMilliseconds;
 
                     watch.Reset();
                     watch.Start();
-                    if (!(results.Zip(problems, (result, problem) => !result.isSynchronizable || Verify.VerifyValidityOfSynchronizingWord(problem, result, degreeOfParallelism)).All(isOK => isOK)
-                        && results.Zip(problems, (result, problem) => Verify.VerifyCernyConjecture(problem, result)).All(isOK => isOK)))
+                    if (!(results
+                        .Zip(problems, (result, problem) =>
+                            !result.isSynchronizable
+                            || Verify.VerifyValidityOfSynchronizingWord(problem, result, degreeOfParallelism))
+                        .All(isOK => isOK)
+                        && results
+                        .Zip(problems, (result, problem) => Verify.VerifyCernyConjecture(problem, result))
+                        .All(isOK => isOK)))
                     {
                         throw new Exception("Incorrect algorithm");
                     }
@@ -68,24 +77,31 @@ namespace GPGPU
                         problemsPerSecond = (int)Math.Round(n / computationElapsed.TotalSeconds)
                     };
 
-                    Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds}ms. Problems per second: {n / computationElapsed.TotalSeconds}. Time per problem {computationElapsed.TotalMilliseconds / n}ms");
-                    Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds}ms. Verifications per second: {n / verificationElapsed.TotalSeconds}. Time per verification {verificationElapsed.TotalMilliseconds / n}ms");
-                    Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100}% synchronizability, {results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWord.Length)} average length of a synchronizing word");
+                    Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds:F2}ms. Problems per second: {n / computationElapsed.TotalSeconds:F2}. Time per problem {computationElapsed.TotalMilliseconds / n:F5}ms");
+                    Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. Time per verification {verificationElapsed.TotalMilliseconds / n:F5}ms");
+                    Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, {results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWord.Length):F2} average length of a synchronizing word");
 
-                    var histogram = results
-                        .Where(result => result.isSynchronizable)
-                        .Histogram(30, result => result.shortestSynchronizingWord.Length);
+                    #region Histogram
+                    //var histogram = results
+                    //                .Where(result => result.isSynchronizable)
+                    //                .Histogram(30, result => result.shortestSynchronizingWord.Length);
 
-                    foreach (var bin in histogram)
-                    {
-                        Console.Write($"{Math.Round(bin.RepresentativeValue)}: ");
-                        for (int i = 0; i < bin.Count * 800 / n || (i == 0 && bin.Count > 0); i++)
-                        {
-                            Console.Write("-");
-                        }
-                        Console.WriteLine();
-                    }
-                    Console.WriteLine();
+                    //foreach (var bin in histogram)
+                    //{
+                    //    Console.Write($"{Math.Round(bin.RepresentativeValue)}: ");
+                    //    for (int i = 0; i < bin.Count * 800 / n || (i == 0 && bin.Count > 0); i++)
+                    //    {
+                    //        Console.Write("-");
+                    //    }
+                    //    Console.WriteLine();
+                    //}
+                    //Console.WriteLine(); 
+                    #endregion
+
+                    #region Benchmark
+                    Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}% "); 
+                    #endregion
+
                 }
                 Console.WriteLine();
                 Console.WriteLine();

@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Shared
 {
-    class BenchmarkResult
+    public class BenchmarkResult
     {
         public int problemsPerSecond;
+        public TimeSpan benchmarkedTime;
     }
 }

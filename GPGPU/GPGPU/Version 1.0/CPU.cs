@@ -2,6 +2,7 @@
 using GPGPU.Shared;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -33,22 +34,30 @@ namespace GPGPU.Version_1._0
                     .ToArray();
             }
         }
+        private static int latestPowerSetCount = 13;
+
+        private static int[] distanceToVertexStatic = new int[latestPowerSetCount];
+        private static int[] previousVertexStatic = new int[latestPowerSetCount];
+        private static bool[] previousLetterUsedEqualsBStatic = new bool[latestPowerSetCount];
+
         public ComputationResult ComputeOne(Problem problemToSolve)
         {
-            var result = new ComputationResult();
+            var benchmarkTiming = new Stopwatch();
+            var result = new ComputationResult
+            {
+                benchmarkResult = new BenchmarkResult()
+            };
             int powerSetCount = 1 << problemToSolve.size;
             int maximumPermissibleWordLength = (problemToSolve.size - 1) * (problemToSolve.size - 1);
             int initialVertex = powerSetCount - 1;
-            var isDiscovered = new bool[powerSetCount];
+            benchmarkTiming.Start();
             var distanceToVertex = new int[powerSetCount];
             var previousVertex = new int[powerSetCount];
             var previousLetterUsedEqualsB = new bool[powerSetCount];
 
 
-
             var queue = new Queue<int>(powerSetCount);
             queue.Enqueue(initialVertex);
-            isDiscovered[initialVertex] = true;
 
             var discoveredSingleton = false;
             int consideringVertex;
@@ -62,6 +71,7 @@ namespace GPGPU.Version_1._0
 
             var precomputedStateTransitioningMatrixA = new int[problemToSolve.size + 1];
             var precomputedStateTransitioningMatrixB = new int[problemToSolve.size + 1];
+            benchmarkTiming.Stop();
 
             precomputedStateTransitioningMatrixA[0] = 0;
             precomputedStateTransitioningMatrixB[0] = 0;
@@ -70,7 +80,6 @@ namespace GPGPU.Version_1._0
                 precomputedStateTransitioningMatrixA[i + 1] = 1 << problemToSolve.stateTransitioningMatrixA[i];
                 precomputedStateTransitioningMatrixB[i + 1] = 1 << problemToSolve.stateTransitioningMatrixB[i];
             }
-
             while (!discoveredSingleton && queue.Count > 0)
             {
                 extractingBits = consideringVertex = queue.Dequeue();
@@ -103,20 +112,18 @@ namespace GPGPU.Version_1._0
                 //    // better be that this automata is not synchronizable!
                 //}
 
-                if (!isDiscovered[vertexAfterTransitionA])
+                if (0 == distanceToVertex[vertexAfterTransitionA])
                 {
                     distanceToVertex[vertexAfterTransitionA] = distanceToVertex[consideringVertex] + 1;
                     previousVertex[vertexAfterTransitionA] = consideringVertex;
                     previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
-                    isDiscovered[vertexAfterTransitionA] = true;
                     queue.Enqueue(vertexAfterTransitionA);
                 }
-                if (!isDiscovered[vertexAfterTransitionB])
+                if (0 == distanceToVertex[vertexAfterTransitionB])
                 {
                     distanceToVertex[vertexAfterTransitionB] = distanceToVertex[consideringVertex] + 1;
                     previousVertex[vertexAfterTransitionB] = consideringVertex;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
-                    isDiscovered[vertexAfterTransitionB] = true;
                     queue.Enqueue(vertexAfterTransitionB);
                 }
             }
@@ -151,6 +158,8 @@ namespace GPGPU.Version_1._0
                 // not a synchronizing automata
                 result.isSynchronizable = false;
             }
+
+            result.benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
             return result;
         }
 

@@ -18,7 +18,7 @@ namespace GPGPU.Result_veryfier
             // for degree of parallelism == 1 the algorithm should be smarter (faster)
             if (degreeOfParallelism > 1)
             {
-                initialQuery = Enumerable.Range(0, problem.size).AsParallel().WithDegreeOfParallelism(degreeOfParallelism);
+                initialQuery = initialQuery.AsParallel().WithDegreeOfParallelism(degreeOfParallelism);
             }
 
             //var partialResult = initialQuery.Select(letter =>

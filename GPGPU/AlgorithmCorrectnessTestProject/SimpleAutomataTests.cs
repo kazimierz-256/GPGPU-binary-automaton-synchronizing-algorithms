@@ -29,7 +29,8 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void YoutubeExperimentalMathematicsSizeLarge()
         {
-            var problem = ProblemGenerator.generateWorstCase(13);
+            var n = 13;
+            var problem = ProblemGenerator.generateWorstCase(n);
 
             var result = GetLatestCPU().ComputeOne(problem);
 
@@ -37,7 +38,7 @@ namespace AlgorithmCorrectnessTestProject
             Assert.IsTrue(result.isSynchronizable);
             Assert.IsNotNull(result.shortestSynchronizingWord);
             Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual(result.shortestSynchronizingWord.Length, 12 * 12);
+            Assert.AreEqual(result.shortestSynchronizingWord.Length, (n - 1) * (n - 1));
         }
 
     }

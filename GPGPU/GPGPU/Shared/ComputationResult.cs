@@ -10,5 +10,6 @@ namespace GPGPU.Shared
     {
         public bool isSynchronizable;
         public bool[] shortestSynchronizingWord;
+        public BenchmarkResult benchmarkResult;
     }
 }
