@@ -118,31 +118,25 @@ namespace GPGPU.Version_1._0
             bool[] isDiscovered = new bool[powerSetCount];
             isDiscovered[initialVertex] = true;
 
-            //if (reuseResources)
-            //{
-            //    // use whatever size is needed, they all should be consistent (of same size)
-            //    if (previousVertexReusable.Length != powerSetCount)
-            //    {
-            //        previousVertexReusable = new ushort[powerSetCount];
-            //        previousLetterUsedEqualsBReusable = new bool[powerSetCount];
-            //        distanceToVertexReusable = new ushort[powerSetCount];
-            //    }
-            //    distanceToVertex = distanceToVertexReusable;
-            //    previousVertex = previousVertexReusable;
-            //    previousLetterUsedEqualsB = previousLetterUsedEqualsBReusable;
-            //}
-            //else
-            //{
-            //    distanceToVertex = new ushort[powerSetCount];
-            //    previousVertex = new ushort[powerSetCount];
-            //    previousLetterUsedEqualsB = new bool[powerSetCount];
-            //}
-
-
-            var distanceToVertexDictionary = new Dictionary<ushort, ushort>(powerSetCount / 16);
-            distanceToVertexDictionary.Add(initialVertex, 0);
-            var previousVertexDictionary = new Dictionary<ushort, ushort>(powerSetCount / 16);
-            var previousLetterUsedEqualsBDictionary = new Dictionary<ushort, bool>(powerSetCount / 16);
+            if (reuseResources)
+            {
+                // use whatever size is needed, they all should be consistent (of same size)
+                if (previousVertexReusable.Length != powerSetCount)
+                {
+                    previousVertexReusable = new ushort[powerSetCount];
+                    previousLetterUsedEqualsBReusable = new bool[powerSetCount];
+                    distanceToVertexReusable = new ushort[powerSetCount];
+                }
+                distanceToVertex = distanceToVertexReusable;
+                previousVertex = previousVertexReusable;
+                previousLetterUsedEqualsB = previousLetterUsedEqualsBReusable;
+            }
+            else
+            {
+                distanceToVertex = new ushort[powerSetCount];
+                previousVertex = new ushort[powerSetCount];
+                previousLetterUsedEqualsB = new bool[powerSetCount];
+            }
             benchmarkTiming.Stop();
 
 
@@ -155,7 +149,7 @@ namespace GPGPU.Version_1._0
             ushort vertexAfterTransitionB;
             int targetIndexPlusOne;
             int extractingBits;
-            ushort firstSingleton = 0;
+            int firstSingleton = 0;
             int distanceToConsideredVertex;
 
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
@@ -174,7 +168,7 @@ namespace GPGPU.Version_1._0
                     maximumBreadth = queue.Count;
 
                 extractingBits = consideringVertex = queue.Dequeue();
-                distanceToConsideredVertex = distanceToVertexDictionary[consideringVertex];
+                distanceToConsideredVertex = distanceToVertex[consideringVertex];
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
@@ -198,18 +192,18 @@ namespace GPGPU.Version_1._0
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
-                    distanceToVertexDictionary.Add(vertexAfterTransitionA, (ushort)(distanceToVertexDictionary[consideringVertex] + 1));
-                    previousVertexDictionary.Add(vertexAfterTransitionA, consideringVertex);
+                    distanceToVertex[vertexAfterTransitionA] = (ushort)(distanceToVertex[consideringVertex] + 1);
+                    previousVertex[vertexAfterTransitionA] = consideringVertex;
                     isDiscovered[vertexAfterTransitionA] = true;
-                    previousLetterUsedEqualsBDictionary.Add(vertexAfterTransitionA, false);
+                    previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
                     queue.Enqueue(vertexAfterTransitionA);
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
-                    distanceToVertexDictionary.Add(vertexAfterTransitionB, (ushort)(distanceToVertexDictionary[consideringVertex] + 1));
-                    previousVertexDictionary.Add(vertexAfterTransitionB, consideringVertex);
+                    distanceToVertex[vertexAfterTransitionB] = (ushort)(distanceToVertex[consideringVertex] + 1);
+                    previousVertex[vertexAfterTransitionB] = consideringVertex;
                     isDiscovered[vertexAfterTransitionB] = true;
-                    previousLetterUsedEqualsBDictionary.Add(vertexAfterTransitionB, true);
+                    previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
                     queue.Enqueue(vertexAfterTransitionB);
                 }
             }
@@ -222,13 +216,13 @@ namespace GPGPU.Version_1._0
                 computationType = ComputationType.CPU_Serial,
                 queueBreadth = maximumBreadth,
                 size = n,
-                discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
+                //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
             };
 
             if (discoveredSingleton)
             {
                 // watch out for off by one error!
-                if (distanceToVertexDictionary[firstSingleton] > maximumPermissibleWordLength)
+                if (distanceToVertex[firstSingleton] > maximumPermissibleWordLength)
                 {
                     throw new Exception("Cerny conjecture is false");
                 }
@@ -237,13 +231,13 @@ namespace GPGPU.Version_1._0
                     // everything is fine
                     result.isSynchronizable = true;
 
-                    int wordLength = distanceToVertexDictionary[firstSingleton];
-                    var currentVertex = firstSingleton;
+                    int wordLength = distanceToVertex[firstSingleton];
+                    int currentVertex = firstSingleton;
                     result.shortestSynchronizingWord = new bool[wordLength];
                     for (int i = wordLength - 1; i >= 0; i--)
                     {
-                        result.shortestSynchronizingWord[i] = previousLetterUsedEqualsBDictionary[currentVertex];
-                        currentVertex = previousVertexDictionary[currentVertex];
+                        result.shortestSynchronizingWord[i] = previousLetterUsedEqualsB[currentVertex];
+                        currentVertex = previousVertex[currentVertex];
                     }
                 }
             }

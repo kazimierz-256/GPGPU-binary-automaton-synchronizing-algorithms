@@ -72,7 +72,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CPU\Version 1.0\Dictionary.cs" />
     <Compile Include="Interfaces\IComputation.cs" />
     <Compile Include="Problem generator\ProblemGenerator.cs" />
     <Compile Include="Result veryfier\Verify.cs" />
