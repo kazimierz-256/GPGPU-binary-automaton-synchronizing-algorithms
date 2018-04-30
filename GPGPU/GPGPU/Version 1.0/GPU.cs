@@ -11,5 +11,6 @@ namespace GPGPU.Version_1._0
     class GPU : IComputation
     {
         public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism) => throw new NotImplementedException();
+        public ComputationResult ComputeOne(Problem problemToSolve) => throw new NotImplementedException();
     }
 }

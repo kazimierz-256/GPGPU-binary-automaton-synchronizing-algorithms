@@ -7,8 +7,9 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Interfaces
 {
-    interface IComputation
+    public interface IComputation
     {
         ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism);
+        ComputationResult ComputeOne(Problem problemToSolve);
     }
 }

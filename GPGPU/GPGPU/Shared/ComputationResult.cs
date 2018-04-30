@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Shared
 {
-    struct ComputationResult
+    public struct ComputationResult
     {
-        bool isSynchronizable;
-        string shortestSynchronizingWord;
+        public bool isSynchronizable;
+        public bool[] shortestSynchronizingWord;
     }
 }

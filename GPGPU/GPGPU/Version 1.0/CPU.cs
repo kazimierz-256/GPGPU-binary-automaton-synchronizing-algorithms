@@ -8,40 +8,47 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Version_1._0
 {
-    class CPU : IComputation
+    public class CPU : IComputation
     {
         public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
         {
             if (degreeOfParallelism == 1)
             {
-                var results = new ComputationResult[problemsToSolve.Length];
-
-                for (int i = 0; i < problemsToSolve.Length; i++)
-                    results[i] = ComputeSerially(problemsToSolve[i]);
-
-                return results;
+                return Enumerable.Range(0, problemsToSolve.Length)
+                    .Select(i => ComputeOne(problemsToSolve[i]))
+                    .ToArray();
             }
             else
             {
+                //var results = new ComputationResult[problemsToSolve.Length];
+
+                //Parallel.For(0, problemsToSolve.Length, new ParallelOptions() { MaxDegreeOfParallelism = degreeOfParallelism }, i =>
+                //    results[i] = ComputeOne(problemsToSolve[i])
+                //);
+                //return results;
                 return problemsToSolve
                     .AsParallel()
                     .WithDegreeOfParallelism(degreeOfParallelism)
-                    .Select(problem => ComputeSerially(problem))
+                    .Select(problem => ComputeOne(problem))
                     .ToArray();
             }
         }
-        private ComputationResult ComputeSerially(Problem problemToSolve)
+        public ComputationResult ComputeOne(Problem problemToSolve)
         {
+            var result = new ComputationResult();
             int powerSetCount = 1 << problemToSolve.size;
             int maximumPermissibleWordLength = (problemToSolve.size - 1) * (problemToSolve.size - 1);
-            var isDiscovered = new bool[problemToSolve.size];
+            int initialVertex = powerSetCount - 1;
+            var isDiscovered = new bool[powerSetCount];
             var distanceToVertex = new int[powerSetCount];
             var previousVertex = new int[powerSetCount];
+            var previousLetterUsedEqualsB = new bool[powerSetCount];
 
-            isDiscovered[powerSetCount - 1] = true;
+
 
             var queue = new Queue<int>(powerSetCount);
-            queue.Enqueue(powerSetCount - 1);
+            queue.Enqueue(initialVertex);
+            isDiscovered[initialVertex] = true;
 
             var discoveredSingleton = false;
             int consideringVertex;
@@ -50,21 +57,21 @@ namespace GPGPU.Version_1._0
             int targetIndexPlusOne;
             int stateCount;
             int extractingBits;
-            int firstSingleton;
+            int firstSingleton = 0;
             int distanceToConsideredVertex;
 
-            var precomputedStateTransitioningMatrixA = new int[problemToSolve + 1];
-            var precomputedStateTransitioningMatrixB = new int[problemToSolve + 1];
+            var precomputedStateTransitioningMatrixA = new int[problemToSolve.size + 1];
+            var precomputedStateTransitioningMatrixB = new int[problemToSolve.size + 1];
 
             precomputedStateTransitioningMatrixA[0] = 0;
             precomputedStateTransitioningMatrixB[0] = 0;
             for (int i = 0; i < problemToSolve.size; i++)
             {
-                precomputedStateTransitioningMatrixA[i + 1] = problemToSolve.stateTransitioningMatrixA[i];
-                precomputedStateTransitioningMatrixB[i + 1] = problemToSolve.stateTransitioningMatrixB[i];
+                precomputedStateTransitioningMatrixA[i + 1] = 1 << problemToSolve.stateTransitioningMatrixA[i];
+                precomputedStateTransitioningMatrixB[i + 1] = 1 << problemToSolve.stateTransitioningMatrixB[i];
             }
 
-            while (!discoveredSingleton || queue.Count > 0)
+            while (!discoveredSingleton && queue.Count > 0)
             {
                 extractingBits = consideringVertex = queue.Dequeue();
                 distanceToConsideredVertex = distanceToVertex[consideringVertex];
@@ -78,7 +85,7 @@ namespace GPGPU.Version_1._0
                     targetIndexPlusOne = (extractingBits & 1) * i;
 
                     vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[targetIndexPlusOne];
-                    vertexAfterTransitionB |= precomputedStateTransitioningMatrixA[targetIndexPlusOne];
+                    vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[targetIndexPlusOne];
                     extractingBits >>= 1;
                 }
 
@@ -90,27 +97,31 @@ namespace GPGPU.Version_1._0
                     break;
                 }
 
-                if (distanceToVertex > maximumPermissibleWordLength)
-                {
-                    // now if this automata happens to be synchronizing then Cerny Conjecture is false!
-                    // better be that this automata is not synchronizable!
-                }
+                //if (distanceToVertex[consideringVertex] > maximumPermissibleWordLength)
+                //{
+                //    // now if this automata happens to be synchronizing then Cerny Conjecture is false!
+                //    // better be that this automata is not synchronizable!
+                //}
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
                     distanceToVertex[vertexAfterTransitionA] = distanceToVertex[consideringVertex] + 1;
                     previousVertex[vertexAfterTransitionA] = consideringVertex;
+                    previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
                     isDiscovered[vertexAfterTransitionA] = true;
                     queue.Enqueue(vertexAfterTransitionA);
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
                     distanceToVertex[vertexAfterTransitionB] = distanceToVertex[consideringVertex] + 1;
-                    previousVertex[vertexAfterTransitionA] = consideringVertex;
+                    previousVertex[vertexAfterTransitionB] = consideringVertex;
+                    previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
                     isDiscovered[vertexAfterTransitionB] = true;
                     queue.Enqueue(vertexAfterTransitionB);
                 }
             }
+
+            // finished main loop
 
             if (discoveredSingleton)
             {
@@ -118,16 +129,30 @@ namespace GPGPU.Version_1._0
                 if (distanceToVertex[firstSingleton] > maximumPermissibleWordLength)
                 {
                     // Cerny Conjecture is false!
+                    throw new Exception("Cerny conjecture is false");
                 }
                 else
                 {
                     // everything is ok
+                    result.isSynchronizable = true;
+
+                    int wordLength = distanceToVertex[firstSingleton];
+                    int currentVertex = firstSingleton;
+                    var resultingWordEqualsB = new bool[wordLength];
+                    for (int i = wordLength - 1; i >= 0; i--)
+                    {
+                        resultingWordEqualsB[i] = previousLetterUsedEqualsB[currentVertex];
+                        currentVertex = previousVertex[currentVertex];
+                    }
+                    result.shortestSynchronizingWord = resultingWordEqualsB;
                 }
             }
             else
             {
                 // not a synchronizing automata
+                result.isSynchronizable = false;
             }
+            return result;
         }
 
     }

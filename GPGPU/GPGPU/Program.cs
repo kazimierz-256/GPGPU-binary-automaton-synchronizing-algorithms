@@ -1,4 +1,5 @@
-﻿using GPGPU.Shared;
+﻿using GPGPU.Result_veryfier;
+using GPGPU.Shared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,10 +15,8 @@ namespace GPGPU
         {
             const int problemSize = 13;
             //int maximumExpectedLengthOfShortestSynchronizingWord = (problemSize - 1) * (problemSize - 1);
-            const int initialProblemSamplingCount = 10;
-            const int maximumProblemSamplingCount = 100;
-            double sizeIncrease = Math.Pow(2, 1d / 3);
-            int degreeOfParallelism = Environment.ProcessorCount;
+            const long initialProblemSamplingCount = 1 << 13;
+            double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             const int problemSeed = 123456;
             var watch = new Stopwatch();
 
@@ -28,20 +27,51 @@ namespace GPGPU
             var resultsDictionary = new Dictionary<int, Dictionary<ComputationType, BenchmarkResult>>();
 
             // in a loop check the performance of the CPU
-            for (int n = initialProblemSamplingCount; n < maximumProblemSamplingCount; n = (int)Math.Round(n * sizeIncrease))
+            double dn = initialProblemSamplingCount;
+            for (
+                int n = (int)dn;
+                ;
+                n = (int)Math.Round(dn *= sizeIncrease))
             {
-                var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
-
-                watch.Start();
-                cpuSolver.Compute(problems, degreeOfParallelism);
-                watch.Stop();
-
-                resultsDictionary[initialProblemSamplingCount][ComputationType.CPU_Parallel] = new BenchmarkResult
+                for (
+                    int degreeOfParallelism = Environment.ProcessorCount;
+                    degreeOfParallelism > 0;
+                    degreeOfParallelism--)
                 {
-                    problemsPerSecond = (int)Math.Round(n / watch.Elapsed.TotalSeconds)
-                };
 
-                Console.WriteLine($"{n} problems computed using {degreeOfParallelism} in {watch.Elapsed.TotalMilliseconds}ms. Problems per second: {n / watch.Elapsed.TotalSeconds}");
+                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
+
+                    watch.Start();
+                    var results = cpuSolver.Compute(problems, degreeOfParallelism);
+                    watch.Stop();
+
+                    var computationElapsed = watch.Elapsed;
+
+                    watch.Reset();
+                    watch.Start();
+                    if (!(results.Zip(problems, (result, problem) => !result.isSynchronizable || Verify.VerifyValidityOfSynchronizingWord(problem, result, degreeOfParallelism)).All(isOK => isOK)
+                        && results.Zip(problems, (result, problem) => Verify.VerifyCernyConjecture(problem, result)).All(isOK => isOK)))
+                    {
+                        throw new Exception("Incorrect algorithm");
+                    }
+                    watch.Stop();
+
+                    var verificationElapsed = watch.Elapsed;
+
+                    if (!resultsDictionary.ContainsKey(n))
+                    {
+                        resultsDictionary.Add(n, new Dictionary<ComputationType, BenchmarkResult>());
+                    }
+                    resultsDictionary[n][ComputationType.CPU_Parallel] = new BenchmarkResult
+                    {
+                        problemsPerSecond = (int)Math.Round(n / computationElapsed.TotalSeconds)
+                    };
+
+                    Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds}ms. Problems per second: {n / computationElapsed.TotalSeconds}. Time per problem {computationElapsed.TotalMilliseconds / n}ms");
+                    Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds}ms. Verifications per second: {n / verificationElapsed.TotalSeconds}. Time per verification {verificationElapsed.TotalMilliseconds / n}ms");
+                    Console.WriteLine();
+                }
+                Console.WriteLine();
                 Console.WriteLine();
             }
 

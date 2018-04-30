@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Shared
 {
-    struct Problem
+    public struct Problem
     {
-        public byte[] stateTransitioningMatrixA;
-        public byte[] stateTransitioningMatrixB;
+        public int[] stateTransitioningMatrixA;
+        public int[] stateTransitioningMatrixB;
         public int size;
 
         internal static Problem[] GetArrayOfProblems(int problemCount, int problemSize, int seed)
@@ -25,15 +25,15 @@ namespace GPGPU.Shared
             var random = new Random(seed);
             var problem = new Problem
             {
-                stateTransitioningMatrixA = new byte[problemSize],
-                stateTransitioningMatrixB = new byte[problemSize],
+                stateTransitioningMatrixA = new int[problemSize],
+                stateTransitioningMatrixB = new int[problemSize],
                 size = problemSize
             };
 
             for (int i = 0; i < problemSize; i++)
             {
-                problem.stateTransitioningMatrixA[i] = (byte)random.Next(0, problemSize);
-                problem.stateTransitioningMatrixB[i] = (byte)random.Next(0, problemSize);
+                problem.stateTransitioningMatrixA[i] = random.Next(0, problemSize);
+                problem.stateTransitioningMatrixB[i] = random.Next(0, problemSize);
             }
 
             return problem;

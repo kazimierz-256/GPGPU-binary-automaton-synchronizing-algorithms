@@ -54,6 +54,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Interfaces\IComputation.cs" />
+    <Compile Include="Problem generator\ProblemGenerator.cs" />
+    <Compile Include="Result veryfier\Verify.cs" />
     <Compile Include="Shared\BenchmarkResult.cs" />
     <Compile Include="Shared\ComputationType.cs" />
     <Compile Include="Shared\ComputationResult.cs" />

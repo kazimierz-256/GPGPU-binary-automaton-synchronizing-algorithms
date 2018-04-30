@@ -8,6 +8,6 @@ namespace GPGPU.Shared
 {
     class BenchmarkResult
     {
-        public TimeSpan problemsPerSecond;
+        public int problemsPerSecond;
     }
 }
