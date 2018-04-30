@@ -13,7 +13,7 @@ namespace GPGPU.Version_1._0
     public class CPU : IComputation
     {
         private static readonly int mostProbablePowerSetCount = 1 << 13;
-        private short[] previousVertexStatic = new short[mostProbablePowerSetCount];
+        private ushort[] previousVertexStatic = new ushort[mostProbablePowerSetCount];
         private bool[] previousLetterUsedEqualsBStatic = new bool[mostProbablePowerSetCount];
 
         public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
@@ -32,7 +32,7 @@ namespace GPGPU.Version_1._0
             {
                 var results = new ComputationResult[problemsToSolve.Length];
                 var reusableLengths = degreeOfParallelism;
-                var previousVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new short[mostProbablePowerSetCount]).ToArray();
+                var previousVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
                 var previousLetterUsedEqualsBReusables = Enumerable.Range(0, reusableLengths).Select(_ => new bool[mostProbablePowerSetCount]).ToArray();
 
                 var reusablesQueue = new ConcurrentQueue<int>();
@@ -82,124 +82,117 @@ namespace GPGPU.Version_1._0
             }
         }
 
-        public ComputationResult ComputeOne(Problem problemToSolve) => ComputeOne(problemToSolve, false);
+        public ComputationResult ComputeOne(Problem problemToSolve) => ComputeOne(problemToSolve);
 
         public ComputationResult ComputeOne(
             Problem problemToSolve,
             bool reuseResources = false,
-            short[] previousVertexReusable = null,
+            ushort[] previousVertexReusable = null,
             bool[] previousLetterUsedEqualsBReusable = null
             )
         {
-            var benchmarkTiming = new Stopwatch();
             var totalTiming = new Stopwatch();
             totalTiming.Start();
+            var benchmarkTiming = new Stopwatch();
 
             var result = new ComputationResult
             {
                 benchmarkResult = new BenchmarkResult()
             };
             var n = problemToSolve.size;
-            int powerSetCount = 1 << n;
-            int maximumPermissibleWordLength = (n - 1) * (n - 1);
-            short initialVertex = (short)(powerSetCount - 1);
+            var powerSetCount = 1 << n;
+            var initialVertex = (ushort)(powerSetCount - 1);
+            var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            short[] distanceToVertex;
-            short[] previousVertex;
+            ushort[] distanceToVertex;
+            ushort[] previousVertex;
             bool[] previousLetterUsedEqualsB;
+            bool[] isDiscovered = new bool[powerSetCount];
+            isDiscovered[initialVertex] = true;
 
-            benchmarkTiming.Start();
+            // about 15% of overall computation using single thread
+            // about 30% of overall computation using multiple threads + reusage
             if (reuseResources)
             {
                 // use whatever size is needed, they all should be consistent (of same size)
                 if (previousVertexReusable.Length != powerSetCount)
                 {
-                    previousVertexReusable = new short[powerSetCount];
+                    previousVertexReusable = new ushort[powerSetCount];
                     previousLetterUsedEqualsBReusable = new bool[powerSetCount];
                 }
-                else
-                {
-                    // about 15% of overall computation!
-                }
-                distanceToVertex = new short[powerSetCount];
+                distanceToVertex = new ushort[powerSetCount];
                 previousVertex = previousVertexReusable;
                 previousLetterUsedEqualsB = previousLetterUsedEqualsBReusable;
             }
             else
             {
-                distanceToVertex = new short[powerSetCount];
-                previousVertex = new short[powerSetCount];
+                distanceToVertex = new ushort[powerSetCount];
+                previousVertex = new ushort[powerSetCount];
                 previousLetterUsedEqualsB = new bool[powerSetCount];
             }
-            benchmarkTiming.Stop();
 
 
-            var queue = new Queue<short>(powerSetCount);
+            var queue = new Queue<ushort>(powerSetCount);
             queue.Enqueue(initialVertex);
 
             var discoveredSingleton = false;
-            short consideringVertex;
-            short vertexAfterTransitionA;
-            short vertexAfterTransitionB;
+            ushort consideringVertex;
+            ushort vertexAfterTransitionA;
+            ushort vertexAfterTransitionB;
             int targetIndexPlusOne;
-            int stateCount;
             int extractingBits;
             int firstSingleton = 0;
             int distanceToConsideredVertex;
 
-            var precomputedStateTransitioningMatrixA = new short[n + 1];
-            var precomputedStateTransitioningMatrixB = new short[n + 1];
+            var precomputedStateTransitioningMatrixA = new ushort[n + 1];
+            var precomputedStateTransitioningMatrixB = new ushort[n + 1];
 
             precomputedStateTransitioningMatrixA[0] = 0;
             precomputedStateTransitioningMatrixB[0] = 0;
             for (int i = 0; i < n; i++)
             {
-                precomputedStateTransitioningMatrixA[i + 1] = (short)(1 << problemToSolve.stateTransitioningMatrixA[i]);
-                precomputedStateTransitioningMatrixB[i + 1] = (short)(1 << problemToSolve.stateTransitioningMatrixB[i]);
+                precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
+                precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
             while (!discoveredSingleton && queue.Count > 0)
             {
                 extractingBits = consideringVertex = queue.Dequeue();
                 distanceToConsideredVertex = distanceToVertex[consideringVertex];
-                stateCount = 0;
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
+                benchmarkTiming.Start();
+                // check for singleton existance
+                //b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
+                if (consideringVertex != 0 && (consideringVertex & (consideringVertex - 1)) == 0)
+                {
+                    discoveredSingleton = true;
+                    firstSingleton = consideringVertex;
+                    break;
+                }
                 // watch out for the index!
                 for (int i = 1; i <= n; i++)
                 {
-                    stateCount += extractingBits & 1;
                     targetIndexPlusOne = (extractingBits & 1) * i;
 
                     vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[targetIndexPlusOne];
                     vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[targetIndexPlusOne];
                     extractingBits >>= 1;
                 }
+                benchmarkTiming.Stop();
 
-                if (stateCount == 1)
+                if (!isDiscovered[vertexAfterTransitionA])
                 {
-                    // we've just discovered a singleton
-                    discoveredSingleton = true;
-                    firstSingleton = consideringVertex;
-                    break;
-                }
-
-                //if (distanceToVertex[consideringVertex] > maximumPermissibleWordLength)
-                //{
-                //    // now if this automata happens to be synchronizing then Cerny Conjecture is false!
-                //    // better be that this automata is not synchronizable!
-                //}
-
-                if (0 == distanceToVertex[vertexAfterTransitionA])
-                {
-                    distanceToVertex[vertexAfterTransitionA] = (short)(distanceToVertex[consideringVertex] + 1);
+                    distanceToVertex[vertexAfterTransitionA] = (ushort)(distanceToVertex[consideringVertex] + 1);
                     previousVertex[vertexAfterTransitionA] = consideringVertex;
+                    isDiscovered[vertexAfterTransitionA] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
                     queue.Enqueue(vertexAfterTransitionA);
                 }
-                if (0 == distanceToVertex[vertexAfterTransitionB])
+                if (!isDiscovered[vertexAfterTransitionB])
                 {
-                    distanceToVertex[vertexAfterTransitionB] = (short)(distanceToVertex[consideringVertex] + 1);
+                    distanceToVertex[vertexAfterTransitionB] = (ushort)(distanceToVertex[consideringVertex] + 1);
                     previousVertex[vertexAfterTransitionB] = consideringVertex;
+                    isDiscovered[vertexAfterTransitionB] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
                     queue.Enqueue(vertexAfterTransitionB);
                 }

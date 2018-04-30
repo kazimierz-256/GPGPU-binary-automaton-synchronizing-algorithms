@@ -14,7 +14,7 @@ namespace GPGPU
     {
         static void Main(string[] args)
         {
-            const int problemSize = 13;
+            const int problemSize = 5;
             //int maximumExpectedLengthOfShortestSynchronizingWord = (problemSize - 1) * (problemSize - 1);
             const long initialProblemSamplingCount = 1 << 13;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
@@ -34,9 +34,9 @@ namespace GPGPU
                 ;
                 n = (int)Math.Round(dn *= sizeIncrease))
             {
-                foreach (var degreeOfParallelism in new int[] { 1, 4, Environment.ProcessorCount })
+                var degreeOfParallelism = 1;
                 {
-                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
+                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
 
                     watch.Start();
                     var results = cpuSolver.Compute(problems, degreeOfParallelism);
