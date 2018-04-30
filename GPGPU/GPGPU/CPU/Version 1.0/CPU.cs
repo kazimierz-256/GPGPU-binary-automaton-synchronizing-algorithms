@@ -165,13 +165,15 @@ namespace GPGPU.Version_1._0
             }
 
             var maximumBreadth = 0;
-            while (vertexQueueReadIndex < vertexQueuePutIndex)
+            var readPowerSets = 0;
+            var putPowerSets = 0;
+            while (vertexQueueReadIndex + readPowerSets * powerSetCount < vertexQueuePutIndex + putPowerSets * powerSetCount)
             {
                 //if (queue.Count > maximumBreadth)
                 //    maximumBreadth = queue.Count;
 
-                extractingBits = consideringVertex = vertexQueue[(vertexQueueReadIndex++) % n];
-                distanceToConsideredVertex = distanceQueue[(distanceQueueReadIndex++) % n];
+                extractingBits = consideringVertex = vertexQueue[vertexQueueReadIndex++];
+                distanceToConsideredVertex = distanceQueue[distanceQueueReadIndex++];
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
@@ -204,11 +206,23 @@ namespace GPGPU.Version_1._0
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
-                    distanceQueue[(distanceQueuePutIndex++) % n] = ((ushort)(distanceToConsideredVertex + 1));
+                    distanceQueue[distanceQueuePutIndex++] = ((ushort)(distanceToConsideredVertex + 1));
                     previousVertex[vertexAfterTransitionB] = consideringVertex;
                     isDiscovered[vertexAfterTransitionB] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
-                    vertexQueue[(vertexQueuePutIndex++) % n] = (vertexAfterTransitionB);
+                    vertexQueue[vertexQueuePutIndex++] = (vertexAfterTransitionB);
+                }
+                if (distanceQueueReadIndex > powerSetCount)
+                {
+                    distanceQueueReadIndex -= powerSetCount;
+                    vertexQueueReadIndex -= powerSetCount;
+                    readPowerSets++;
+                }
+                if (distanceQueuePutIndex > powerSetCount)
+                {
+                    distanceQueuePutIndex -= powerSetCount;
+                    vertexQueuePutIndex -= powerSetCount;
+                    putPowerSets++;
                 }
             }
 
