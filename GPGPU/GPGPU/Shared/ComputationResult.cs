@@ -14,5 +14,6 @@ namespace GPGPU.Shared
         public int queueBreadth;
         public ComputationType computationType;
         public int size;
+        public int discoveredVertices;
     }
 }

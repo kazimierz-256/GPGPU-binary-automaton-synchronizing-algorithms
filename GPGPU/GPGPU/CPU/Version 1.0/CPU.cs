@@ -140,7 +140,7 @@ namespace GPGPU.Version_1._0
             benchmarkTiming.Stop();
 
 
-            var queue = new Queue<ushort>(n * 4);
+            var queue = new Queue<ushort>(n * 5);
             queue.Enqueue(initialVertex);
 
             var discoveredSingleton = false;
@@ -215,6 +215,8 @@ namespace GPGPU.Version_1._0
                 benchmarkResult = new BenchmarkResult(),
                 computationType = ComputationType.CPU_Serial,
                 queueBreadth = maximumBreadth,
+                size = n,
+                discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
             };
 
             if (discoveredSingleton)
