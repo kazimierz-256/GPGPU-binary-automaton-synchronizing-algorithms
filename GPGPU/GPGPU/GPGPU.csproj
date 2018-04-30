@@ -72,6 +72,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CPU\Custom queue\CPU_queue.cs" />
     <Compile Include="Interfaces\IComputation.cs" />
     <Compile Include="Problem generator\ProblemGenerator.cs" />
     <Compile Include="Result veryfier\Verify.cs" />

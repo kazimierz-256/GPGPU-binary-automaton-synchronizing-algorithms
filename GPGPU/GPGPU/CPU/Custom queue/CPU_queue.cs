@@ -8,9 +8,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GPGPU.Version_1._0
+namespace GPGPU.CPU.Custom_queue
 {
-    public class CPU : IComputation
+    class CPU_queue : IComputation
     {
         private static readonly int mostProbablePowerSetCount = 1 << 13;
         private ushort[] previousVertexStatic = new ushort[mostProbablePowerSetCount];
@@ -110,7 +110,6 @@ namespace GPGPU.Version_1._0
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            ushort[] distanceToVertex;
             ushort[] previousVertex;
             bool[] previousLetterUsedEqualsB;
             benchmarkTiming.Start();
@@ -125,32 +124,36 @@ namespace GPGPU.Version_1._0
                 {
                     previousVertexReusable = new ushort[powerSetCount];
                     previousLetterUsedEqualsBReusable = new bool[powerSetCount];
-                    distanceToVertexReusable = new ushort[powerSetCount];
                 }
-                distanceToVertex = distanceToVertexReusable;
                 previousVertex = previousVertexReusable;
                 previousLetterUsedEqualsB = previousLetterUsedEqualsBReusable;
             }
             else
             {
-                distanceToVertex = new ushort[powerSetCount];
                 previousVertex = new ushort[powerSetCount];
                 previousLetterUsedEqualsB = new bool[powerSetCount];
             }
             benchmarkTiming.Stop();
 
 
-            var queue = new Queue<ushort>(n * 5);
-            queue.Enqueue(initialVertex);
+            var vertexQueue = new ushort[powerSetCount];
+            vertexQueue[0] = initialVertex;
+            var vertexQueueReadIndex = 0;
+            var vertexQueuePutIndex = 1;
+            var distanceQueue = new ushort[powerSetCount];
+            var distanceQueueReadIndex = 0;
+            var distanceQueuePutIndex = 1;
+            //distanceQueue[0] = 0;
 
             var discoveredSingleton = false;
             ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
             int targetIndexPlusOne;
-            int extractingBits;
+            ushort extractingBits;
             ushort firstSingleton = 0;
-            ushort nextDistance;
+            ushort firstSingletonDistance = 0;
+            ushort distanceToConsideredVertex;
 
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
             var precomputedStateTransitioningMatrixB = new ushort[n + 1];
@@ -162,14 +165,15 @@ namespace GPGPU.Version_1._0
             }
 
             var maximumBreadth = 0;
-            while (queue.Count > 0)
+            var readPowerSets = 0;
+            var putPowerSets = 0;
+            while (vertexQueueReadIndex + readPowerSets * powerSetCount < vertexQueuePutIndex + putPowerSets * powerSetCount)
             {
-                if (queue.Count > maximumBreadth)
-                    maximumBreadth = queue.Count;
+                //if (queue.Count > maximumBreadth)
+                //    maximumBreadth = queue.Count;
 
-                extractingBits = consideringVertex = queue.Dequeue();
-                nextDistance = distanceToVertex[consideringVertex];
-                ++nextDistance;
+                extractingBits = consideringVertex = vertexQueue[vertexQueueReadIndex++];
+                distanceToConsideredVertex = distanceQueue[distanceQueueReadIndex++];
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
@@ -179,6 +183,7 @@ namespace GPGPU.Version_1._0
                 {
                     discoveredSingleton = true;
                     firstSingleton = consideringVertex;
+                    firstSingletonDistance = distanceToConsideredVertex;
                     break;
                 }
                 // watch out for the index range in the for loop
@@ -193,19 +198,31 @@ namespace GPGPU.Version_1._0
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
-                    isDiscovered[vertexAfterTransitionA] = true;
-                    distanceToVertex[vertexAfterTransitionA] = nextDistance;
+                    distanceQueue[distanceQueuePutIndex++] = ((ushort)(distanceToConsideredVertex + 1));
                     previousVertex[vertexAfterTransitionA] = consideringVertex;
+                    isDiscovered[vertexAfterTransitionA] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
-                    queue.Enqueue(vertexAfterTransitionA);
+                    vertexQueue[vertexQueuePutIndex++] = (vertexAfterTransitionA);
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
-                    isDiscovered[vertexAfterTransitionB] = true;
-                    distanceToVertex[vertexAfterTransitionB] = nextDistance;
+                    distanceQueue[distanceQueuePutIndex++] = ((ushort)(distanceToConsideredVertex + 1));
                     previousVertex[vertexAfterTransitionB] = consideringVertex;
+                    isDiscovered[vertexAfterTransitionB] = true;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
-                    queue.Enqueue(vertexAfterTransitionB);
+                    vertexQueue[vertexQueuePutIndex++] = (vertexAfterTransitionB);
+                }
+                if (distanceQueueReadIndex > powerSetCount)
+                {
+                    distanceQueueReadIndex -= powerSetCount;
+                    vertexQueueReadIndex -= powerSetCount;
+                    readPowerSets++;
+                }
+                if (distanceQueuePutIndex > powerSetCount)
+                {
+                    distanceQueuePutIndex -= powerSetCount;
+                    vertexQueuePutIndex -= powerSetCount;
+                    putPowerSets++;
                 }
             }
 
@@ -223,7 +240,7 @@ namespace GPGPU.Version_1._0
             if (discoveredSingleton)
             {
                 // watch out for off by one error!
-                if (distanceToVertex[firstSingleton] > maximumPermissibleWordLength)
+                if (firstSingletonDistance > maximumPermissibleWordLength)
                 {
                     throw new Exception("Cerny conjecture is false");
                 }
@@ -232,7 +249,7 @@ namespace GPGPU.Version_1._0
                     // everything is fine
                     result.isSynchronizable = true;
 
-                    int wordLength = distanceToVertex[firstSingleton];
+                    int wordLength = firstSingletonDistance;
                     int currentVertex = firstSingleton;
                     result.shortestSynchronizingWord = new bool[wordLength];
                     for (int i = wordLength - 1; i >= 0; i--)
@@ -256,3 +273,5 @@ namespace GPGPU.Version_1._0
 
     }
 }
+
+
