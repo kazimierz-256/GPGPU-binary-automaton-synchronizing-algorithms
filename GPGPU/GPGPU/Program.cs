@@ -29,11 +29,8 @@ namespace GPGPU
             var degreeOfParallelism = 1;
 
             // in a loop check the performance of the CPU
-            double dn = initialProblemSamplingCount;
-            for (
-                int n = (int)dn;
-                ;
-                n = (int)Math.Round(dn *= sizeIncrease))
+            double doublePrecisionN = initialProblemSamplingCount;
+            for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
 
                 var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
@@ -48,14 +45,14 @@ namespace GPGPU
 
                 watch.Reset();
                 watch.Start();
-                if (!(results
-                    .Zip(problems, (result, problem) =>
-                        !result.isSynchronizable
-                        || Verify.VerifyValidityOfSynchronizingWord(problem, result, degreeOfParallelism))
-                    .All(isOK => isOK)
-                    && results
-                    .Zip(problems, (result, problem) => Verify.VerifyCernyConjecture(problem, result))
-                    .All(isOK => isOK)))
+                if (!(
+                        results.Zip(problems, (result, problem) =>
+                            !result.isSynchronizable || Verify.VerifyValidityOfSynchronizingWord(problem, result, degreeOfParallelism)
+                        ).All(isOK => isOK)
+                        && results.Zip(problems, (result, problem) =>
+                            Verify.VerifyCernyConjecture(problem, result)
+                        ).All(isOK => isOK)
+                    ))
                 {
                     throw new Exception("Incorrect algorithm");
                 }

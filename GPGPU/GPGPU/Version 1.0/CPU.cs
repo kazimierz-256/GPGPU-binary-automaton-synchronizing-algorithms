@@ -142,7 +142,7 @@ namespace GPGPU.Version_1._0
             }
 
 
-            var queue = new Queue<ushort>(powerSetCount);
+            var queue = new Queue<ushort>(n * 2);
             queue.Enqueue(initialVertex);
 
             var discoveredSingleton = false;
@@ -157,15 +157,14 @@ namespace GPGPU.Version_1._0
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
             var precomputedStateTransitioningMatrixB = new ushort[n + 1];
 
-            precomputedStateTransitioningMatrixA[0] = 0;
-            precomputedStateTransitioningMatrixB[0] = 0;
             for (int i = 0; i < n; i++)
             {
                 precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
                 precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
             benchmarkTiming.Stop();
-            while (!discoveredSingleton && queue.Count > 0)
+
+            while (queue.Count > 0)
             {
                 extractingBits = consideringVertex = queue.Dequeue();
                 distanceToConsideredVertex = distanceToVertex[consideringVertex];
@@ -180,7 +179,7 @@ namespace GPGPU.Version_1._0
                     firstSingleton = consideringVertex;
                     break;
                 }
-                // watch out for the index!
+                // watch out for the index range in the for loop
                 for (int i = 1; i <= n; i++)
                 {
                     targetIndexPlusOne = (extractingBits & 1) * i;
@@ -215,12 +214,11 @@ namespace GPGPU.Version_1._0
                 // watch out for off by one error!
                 if (distanceToVertex[firstSingleton] > maximumPermissibleWordLength)
                 {
-                    // Cerny Conjecture is false!
                     throw new Exception("Cerny conjecture is false");
                 }
                 else
                 {
-                    // everything is ok
+                    // everything is fine
                     result.isSynchronizable = true;
 
                     int wordLength = distanceToVertex[firstSingleton];
@@ -236,6 +234,7 @@ namespace GPGPU.Version_1._0
             else
             {
                 // not a synchronizing automata
+                // is this correctly computed?
                 result.isSynchronizable = false;
             }
 
