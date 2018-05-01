@@ -1,4 +1,5 @@
 ﻿using GPGPU.Interfaces;
+using GPGPU.Problem_generator;
 using GPGPU.Result_veryfier;
 using GPGPU.Shared;
 using LinqStatistics;
@@ -16,9 +17,9 @@ namespace GPGPU
         static void Main(string[] args)
         {
             #region Program definitions
-            const int problemSize = 5;
-            IComputation theSolver = new SlimCPU();
-            const long initialProblemSamplingCount = 1 << 8;
+            const int problemSize = 13;
+            IComputation theSolver = new SlimGPU();
+            const long initialProblemSamplingCount = 1 << 4;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -28,7 +29,7 @@ namespace GPGPU
             var version = theSolver.GetType().Namespace;
             var csvBuilder = new StringBuilder("problemcount,cputime,gputime,cpugpucombinedtime");
             var resultsDictionary = new List<ComputationResult>();
-            var degreeOfParallelism = 8;
+            var degreeOfParallelism = 1;
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
@@ -38,6 +39,7 @@ namespace GPGPU
                 void computeLoopUsing(IComputation solver)
                 {
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
+                    //var problems = new[] { ProblemGenerator.generateWorstCase(problemSize) };
 
                     watch.Start();
                     var results = solver.Compute(problems, degreeOfParallelism);

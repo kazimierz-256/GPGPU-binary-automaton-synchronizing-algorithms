@@ -21,26 +21,27 @@ namespace GPGPU
         {
             var gpu = Gpu.Default;
             var n = problemToSolve.size;
+            var power = 1 << n;
 
             // transform this into streams
 
             // allocate isDiscovered
             var warps = 4;
-            // each isDiscovered has 8 bits of room :/
+            // each isDiscovered has 2 bytes of room
             var launchParameters = new LaunchParam(
                 1,
                 32 * warps,
-                (1 << problemToSolve.size) * 4 + 1
-            );// divide by 8?
+                power * 2 + 1
+            );
 
 
-            var precomputedStateTransitioningMatrixA = new int[n + 1];
-            var precomputedStateTransitioningMatrixB = new int[n + 1];
+            var precomputedStateTransitioningMatrixA = new int[n];
+            var precomputedStateTransitioningMatrixB = new int[n];
 
             for (int i = 0; i < n; i++)
             {
-                precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
-                precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
+                precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
+                precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
 
             var gpuA = gpu.Allocate(precomputedStateTransitioningMatrixA);
@@ -79,41 +80,42 @@ namespace GPGPU
             int[] shortestSynchronizingWordLength)
         {
             //blockDim.x, blockDim.y
-            var n = precomputedStateTransitioningMatrixA.Length - 1;
+            var n = precomputedStateTransitioningMatrixA.Length;
             var power = 1 << n;
 
             var ptr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>());
-            var isDiscoveredPtr = ptr;
+            var isDiscoveredPtr = ptr.Volatile();
             var isToBeProcessedDuringNextIteration = ptr.Ptr(power).Volatile();
-            //var shouldStop = ptr.Ptr(power).Reinterpret<int>();
-            isToBeProcessedDuringNextIteration[power - 1] = true;
-            int nextDistance = 1;
+            var shouldStop = ptr.Ptr(power * 2).Reinterpret<bool>();
+            if (threadIdx.x == 0)
+                isToBeProcessedDuringNextIteration[power - 1] = true;
+            ushort nextDistance = 1;
             int vertexAfterTransitionA, vertexAfterTransitionB;
             int myPart = (power + blockDim.x - 1) / blockDim.x;
-            // very poor condition
-            while (!isSynchronizing[0])
+            int discoveredVertices = 0;
+            int beginningPointer = threadIdx.x * myPart;
+            int endingPointer = (threadIdx.x + 1) * myPart;
+            if (power < endingPointer)
+                endingPointer = power;
+
+            while (discoveredVertices < endingPointer - beginningPointer && !shouldStop[0])
             {
-                for (int pointer = threadIdx.x * myPart;
-                    pointer < (threadIdx.x + 1) * myPart && pointer < power;
-                    pointer++)
+                for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                 {
-                    if (!isToBeProcessedDuringNextIteration[pointer])
+                    if (!isToBeProcessedDuringNextIteration[consideringVertex])
                         continue;
                     else
-                        isToBeProcessedDuringNextIteration[pointer] = false;
-
-                    var consideringVertexThenExtractingBits = pointer;
-                    int targetIndexPlusOne;
+                        isToBeProcessedDuringNextIteration[consideringVertex] = false;
 
                     vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
-                    for (int i = 1; i <= n; i++)
+                    for (int i = 0; i < n; i++)
                     {
-                        targetIndexPlusOne = (consideringVertexThenExtractingBits & 1) * i;
-
-                        vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[targetIndexPlusOne];
-                        vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[targetIndexPlusOne];
-                        consideringVertexThenExtractingBits >>= 1;
+                        if (0 != ((1 << i) & consideringVertex))
+                        {
+                            vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
+                            vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
+                        }
                     }
 
                     if (!isDiscoveredPtr[vertexAfterTransitionA])
@@ -123,9 +125,9 @@ namespace GPGPU
 
                         if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
                         {
-                            //DeviceFunction.AtomicExchange(shouldStop, nextDistance);
-                            isSynchronizing[0] = true;
                             shortestSynchronizingWordLength[0] = nextDistance;
+                            isSynchronizing[0] = true;
+                            shouldStop[0] = true;
                             break;
                         }
 
@@ -138,15 +140,14 @@ namespace GPGPU
 
                         if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
                         {
-                            //DeviceFunction.AtomicExchange(shouldStop, nextDistance);
-                            isSynchronizing[0] = true;
                             shortestSynchronizingWordLength[0] = nextDistance;
+                            isSynchronizing[0] = true;
+                            shouldStop[0] = true;
                             break;
                         }
 
                     }
                 }
-
                 ++nextDistance;
                 DeviceFunction.SyncThreads();
             }

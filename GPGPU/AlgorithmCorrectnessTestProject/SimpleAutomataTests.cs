@@ -11,14 +11,14 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputation GetLatestCPU() => new SlimCPU();
+        private IComputation GetLatestComputingUnit() => new SlimGPU();
 
         [TestMethod]
         public void YoutubeExperimentalMathematicsSize3()
         {
             var problem = ProblemGenerator.generateWorstCase(3);
 
-            var result = GetLatestCPU().ComputeOne(problem);
+            var result = GetLatestComputingUnit().ComputeOne(problem);
 
             Assert.IsNotNull(result);
             Assert.IsTrue(result.isSynchronizable);
@@ -29,10 +29,10 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void YoutubeExperimentalMathematicsSizeLarge()
         {
-            var n = 13;
+            var n = 5;
             var problem = ProblemGenerator.generateWorstCase(n);
 
-            var result = GetLatestCPU().ComputeOne(problem);
+            var result = GetLatestComputingUnit().ComputeOne(problem);
 
             Assert.IsNotNull(result);
             Assert.IsTrue(result.isSynchronizable);
