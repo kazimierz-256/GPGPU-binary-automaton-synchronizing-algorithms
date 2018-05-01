@@ -11,7 +11,7 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputation GetLatestCPU() => new SlimCPU();
+        private IComputation GetLatestCPU() => new SlimGPU();
 
         [TestMethod]
         public void YoutubeExperimentalMathematicsSize3()
@@ -24,7 +24,7 @@ namespace AlgorithmCorrectnessTestProject
             Assert.IsTrue(result.isSynchronizable);
             //Assert.IsNotNull(result.shortestSynchronizingWord);
             //Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual(result.shortestSynchronizingWordLength, 4);
+            Assert.AreEqual(4, result.shortestSynchronizingWordLength);
         }
         [TestMethod]
         public void YoutubeExperimentalMathematicsSizeLarge()
@@ -38,7 +38,7 @@ namespace AlgorithmCorrectnessTestProject
             Assert.IsTrue(result.isSynchronizable);
             //Assert.IsNotNull(result.shortestSynchronizingWord);
             //Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual(result.shortestSynchronizingWordLength, (n - 1) * (n - 1));
+            Assert.AreEqual((n - 1) * (n - 1), result.shortestSynchronizingWordLength);
         }
 
     }

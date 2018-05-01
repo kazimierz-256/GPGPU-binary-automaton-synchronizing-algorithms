@@ -16,9 +16,9 @@ namespace GPGPU
         static void Main(string[] args)
         {
             #region Program definitions
-            const int problemSize = 13;
-            IComputation theSolver = new SlimCPU();
-            const long initialProblemSamplingCount = 1 << 13;
+            const int problemSize = 4;
+            IComputation theSolver = new SlimGPU();
+            const long initialProblemSamplingCount = 1 << 4;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -44,8 +44,8 @@ namespace GPGPU
                     watch.Stop();
 
                     var computationElapsed = watch.Elapsed;
-                    var fractionOfTime = results.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
-                        / results.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
+                    //var fractionOfTime = results.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
+                    //    / results.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
 
                     watch.Reset();
                     watch.Start();
@@ -71,34 +71,34 @@ namespace GPGPU
                         $"Problems per second: {n / computationElapsed.TotalSeconds:F2}. " +
                         $"Time per problem {computationElapsed.TotalMilliseconds / n:F5}ms");
 
-                    Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. " +
-                        $"Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. " +
-                        $"Time per verification {verificationElapsed.TotalMilliseconds / n:F5}ms");
+                    //Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. " +
+                    //    $"Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. " +
+                    //    $"Time per verification {verificationElapsed.TotalMilliseconds / n:F5}ms");
 
-                    Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, " +
-                        $"{results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWordLength):F2} average length of a synchronizing word");
+                    //Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, " +
+                    //    $"{results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWordLength):F2} average length of a synchronizing word");
 
-                    #region Histogram
-                    var histogram = results
-                                    .Where(result => result.isSynchronizable)
-                                    .Histogram(30, result => result.shortestSynchronizingWordLength);
+                    //#region Histogram
+                    //var histogram = results
+                    //                .Where(result => result.isSynchronizable)
+                    //                .Histogram(30, result => result.shortestSynchronizingWordLength);
 
-                    foreach (var bin in histogram)
-                    {
-                        Console.Write($"{Math.Round(bin.RepresentativeValue)} (count: {bin.Count}): ");
-                        for (int i = 0; i < bin.Count * 500 / n || (i == 0 && bin.Count > 0); i++)
-                        {
-                            Console.Write("-");
-                        }
-                        Console.WriteLine();
-                    }
-                    Console.WriteLine();
-                    #endregion
+                    //foreach (var bin in histogram)
+                    //{
+                    //    Console.Write($"{Math.Round(bin.RepresentativeValue)} (count: {bin.Count}): ");
+                    //    for (int i = 0; i < bin.Count * 500 / n || (i == 0 && bin.Count > 0); i++)
+                    //    {
+                    //        Console.Write("-");
+                    //    }
+                    //    Console.WriteLine();
+                    //}
+                    //Console.WriteLine();
+                    //#endregion
 
                     #region Benchmark
-                    Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}%");
+                    //Console.WriteLine($"benchmarked time took {100 * fractionOfTime:F2}%");
                     #endregion
-                    Console.WriteLine(results.Average(result => result.queueBreadth));
+                    //Console.WriteLine(results.Average(result => result.queueBreadth));
 
                     Console.WriteLine();
                     Console.WriteLine();

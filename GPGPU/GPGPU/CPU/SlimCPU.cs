@@ -44,7 +44,7 @@ namespace GPGPU
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            bool[] isDiscovered = new bool[powerSetCount];
+            var isDiscovered = new bool[powerSetCount];
             isDiscovered[initialVertex] = true;
 
 
