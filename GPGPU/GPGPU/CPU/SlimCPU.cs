@@ -52,24 +52,24 @@ namespace GPGPU
             queue.Enqueue(initialVertex);
 
             var discoveredSingleton = false;
-            ushort consideringVertexThenExtractingBits;
+            ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
             int targetIndexPlusOne;
             ushort firstSingletonDistance = 0;
 
-            var precomputedStateTransitioningMatrixA = new ushort[n + 1];
-            var precomputedStateTransitioningMatrixB = new ushort[n + 1];
+            var precomputedStateTransitioningMatrixA = new ushort[n][];
+            var precomputedStateTransitioningMatrixB = new ushort[n][];
 
             for (int i = 0; i < n; i++)
             {
-                precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
-                precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
+                precomputedStateTransitioningMatrixA[i] = new ushort[] { 0, (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]) };
+                precomputedStateTransitioningMatrixB[i] = new ushort[] { 0, (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]) };
             }
 
             var maximumBreadth = 0;
-            ushort bumpUpVertex = 0;
             ushort currentNextDistance = 1;
+            ushort verticesUntilBump = ushort.MaxValue;
             bool seekingFirstNext = true;
 
             benchmarkTiming.Start();
@@ -78,8 +78,8 @@ namespace GPGPU
                 //if (queue.Count > maximumBreadth)
                 //    maximumBreadth = queue.Count;
 
-                consideringVertexThenExtractingBits = queue.Dequeue();
-                if (consideringVertexThenExtractingBits == bumpUpVertex)
+                consideringVertex = queue.Dequeue();
+                if (--verticesUntilBump == 0)
                 {
                     ++currentNextDistance;
                     seekingFirstNext = true;
@@ -92,47 +92,47 @@ namespace GPGPU
                 // note: consideringVertex cannot ever be equal to 0
 
                 // watch out for the index range in the for loop
-                for (int i = 1; i <= n; i++)
+                for (int i = 0; i < n; i++)
                 {
-                    targetIndexPlusOne = (consideringVertexThenExtractingBits & 1) * i;
-
-                    vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[targetIndexPlusOne];
-                    vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[targetIndexPlusOne];
-                    consideringVertexThenExtractingBits >>= 1;
+                    targetIndexPlusOne = 1 & (consideringVertex >> i);
+                    vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i][targetIndexPlusOne];
+                    vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i][targetIndexPlusOne];
                 }
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
-                    if (seekingFirstNext)
-                    {
-                        seekingFirstNext = false;
-                        bumpUpVertex = vertexAfterTransitionA;
-                    }
-                    isDiscovered[vertexAfterTransitionA] = true;
-                    queue.Enqueue(vertexAfterTransitionA);
-
                     if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
                     {
                         discoveredSingleton = true;
                         firstSingletonDistance = currentNextDistance;
                         break;
                     }
-                }
-                if (!isDiscovered[vertexAfterTransitionB])
-                {
+
+                    isDiscovered[vertexAfterTransitionA] = true;
+                    queue.Enqueue(vertexAfterTransitionA);
+
                     if (seekingFirstNext)
                     {
                         seekingFirstNext = false;
-                        bumpUpVertex = vertexAfterTransitionB;
+                        verticesUntilBump = (ushort)queue.Count;
                     }
-                    isDiscovered[vertexAfterTransitionB] = true;
-                    queue.Enqueue(vertexAfterTransitionB);
-
+                }
+                if (!isDiscovered[vertexAfterTransitionB])
+                {
                     if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
                     {
                         discoveredSingleton = true;
                         firstSingletonDistance = currentNextDistance;
                         break;
+                    }
+
+                    isDiscovered[vertexAfterTransitionB] = true;
+                    queue.Enqueue(vertexAfterTransitionB);
+
+                    if (seekingFirstNext)
+                    {
+                        seekingFirstNext = false;
+                        verticesUntilBump = (ushort)queue.Count;
                     }
                 }
             }

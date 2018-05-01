@@ -16,9 +16,9 @@ namespace GPGPU
         static void Main(string[] args)
         {
             #region Program definitions
-            const int problemSize = 4;
+            const int problemSize = 5;
             IComputation theSolver = new SlimGPU();
-            const long initialProblemSamplingCount = 1 << 4;
+            const long initialProblemSamplingCount = 1 << 8;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             #endregion
 
