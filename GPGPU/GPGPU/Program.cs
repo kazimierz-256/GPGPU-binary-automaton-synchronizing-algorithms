@@ -19,7 +19,7 @@ namespace GPGPU
             #region Program definitions
             const int problemSize = 13;
             IComputation theSolver = new SlimGPU();
-            const long initialProblemSamplingCount = 1 << 4;
+            const long initialProblemSamplingCount = 1 << 10;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -33,7 +33,7 @@ namespace GPGPU
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
-            for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            for (int n = (int)doublePrecisionN; n < 100000; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
                 computeLoopUsing(theSolver);
                 void computeLoopUsing(IComputation solver)

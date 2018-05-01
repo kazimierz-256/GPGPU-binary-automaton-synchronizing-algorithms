@@ -12,143 +12,182 @@ namespace GPGPU
 {
     public class SlimGPU : IComputation
     {
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism) =>
-            Enumerable.Range(0, problemsToSolve.Length)
-            .Select(i => ComputeOne(problemsToSolve[i]))
-            .ToArray();
-
         public ComputationResult ComputeOne(Problem problemToSolve)
+        => Compute(new[] { problemToSolve }, 1)[0];
+
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
         {
+            //Enumerable.Range(0, problemsToSolve.Length)
+            //.Select(i => ComputeOne(problemsToSolve[i]))
+            //.ToArray();
+
+
+            var warps = 32; // dunno what to do with this guy
             var gpu = Gpu.Default;
-            var n = problemToSolve.size;
+            var n = problemsToSolve[0].size;
             var power = 1 << n;
 
             // transform this into streams
 
-            // allocate isDiscovered
-            var warps = 4;
-            // each isDiscovered has 2 bytes of room
             var launchParameters = new LaunchParam(
                 1,
                 32 * warps,
-                power * 2 + 1
+                power * 2 + 1 + 1
             );
 
 
-            var precomputedStateTransitioningMatrixA = new int[n];
-            var precomputedStateTransitioningMatrixB = new int[n];
+            var precomputedStateTransitioningMatrixA = new int[problemsToSolve.Length * n];
+            var precomputedStateTransitioningMatrixB = new int[problemsToSolve.Length * n];
 
-            for (int i = 0; i < n; i++)
+            for (int problem = 0; problem < problemsToSolve.Length; problem++)
             {
-                precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
-                precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
+                for (int i = 0; i < n; i++)
+                {
+                    precomputedStateTransitioningMatrixA[problem * n + i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixA[i]);
+                    precomputedStateTransitioningMatrixB[problem * n + i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixB[i]);
+                }
             }
 
             var gpuA = gpu.Allocate(precomputedStateTransitioningMatrixA);
             var gpuB = gpu.Allocate(precomputedStateTransitioningMatrixB);
-            var shortestSynchronizingWordLength = gpu.Allocate<int>(1);
-            var isSynchronizable = gpu.Allocate<bool>(1);
+            var shortestSynchronizingWordLength = gpu.Allocate<int>(problemsToSolve.Length);
+            var isSynchronizable = gpu.Allocate<bool>(problemsToSolve.Length);
+            var arrayCount = gpu.Allocate(new[] { problemsToSolve.Length });
 
             gpu.Launch(
                 Kernel,
                 launchParameters,
+                arrayCount,
                 gpuA,
                 gpuB,
                 isSynchronizable,
                 shortestSynchronizingWordLength
                 );
 
-            var result = new ComputationResult()
-            {
-                size = problemToSolve.size,
-                isSynchronizable = Gpu.CopyToHost(isSynchronizable)[0],
-                shortestSynchronizingWordLength = Gpu.CopyToHost(shortestSynchronizingWordLength)[0]
-            };
+            var results = Gpu.CopyToHost(isSynchronizable).Zip(Gpu.CopyToHost(shortestSynchronizingWordLength), (isSyncable, shortestWordLength)
+                => new ComputationResult()
+                {
+                    size = problemsToSolve[0].size,
+                    isSynchronizable = isSyncable,
+                    shortestSynchronizingWordLength = shortestWordLength
+                }
+                ).ToArray();
 
             Gpu.Free(gpuA);
             Gpu.Free(gpuB);
             Gpu.Free(shortestSynchronizingWordLength);
             Gpu.Free(isSynchronizable);
+            Gpu.Free(arrayCount);
 
-            return result;
+            return results;
         }
 
         public static void Kernel(
+            int[] arrayCount,
             int[] precomputedStateTransitioningMatrixA,
             int[] precomputedStateTransitioningMatrixB,
             bool[] isSynchronizing,
             int[] shortestSynchronizingWordLength)
         {
             //blockDim.x, blockDim.y
-            var n = precomputedStateTransitioningMatrixA.Length;
+            var n = precomputedStateTransitioningMatrixA.Length / arrayCount[0];
             var power = 1 << n;
 
             var ptr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>());
             var isDiscoveredPtr = ptr.Volatile();
             var isToBeProcessedDuringNextIteration = ptr.Ptr(power).Volatile();
-            var shouldStop = ptr.Ptr(power * 2).Reinterpret<bool>();
+            var shouldStop = ptr.Ptr(power * 2).Volatile();
+            var addedSomethingThisRound = ptr.Ptr(power * 2 + 1).Volatile();
             if (threadIdx.x == 0)
                 isToBeProcessedDuringNextIteration[power - 1] = true;
             ushort nextDistance = 1;
             int vertexAfterTransitionA, vertexAfterTransitionB;
             int myPart = (power + blockDim.x - 1) / blockDim.x;
-            int discoveredVertices = 0;
+            int correctlyProcessed = 0;
             int beginningPointer = threadIdx.x * myPart;
             int endingPointer = (threadIdx.x + 1) * myPart;
             if (power < endingPointer)
                 endingPointer = power;
 
-            while (discoveredVertices < endingPointer - beginningPointer && !shouldStop[0])
+            for (int ac = 0; ac < arrayCount[0]; ac++)
             {
+                // what if it is not synchronizable
+                while (correctlyProcessed < endingPointer - beginningPointer && !shouldStop[0])
+                {
+                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
+                    {
+                        if (!isToBeProcessedDuringNextIteration[consideringVertex])
+                            continue;
+                        else
+                        {
+                            isToBeProcessedDuringNextIteration[consideringVertex] = false;
+                            ++correctlyProcessed;
+                        }
+
+                        vertexAfterTransitionA = vertexAfterTransitionB = 0;
+
+                        for (int i = 0; i < n; i++)
+                        {
+                            if (0 != ((1 << i) & consideringVertex))
+                            {
+                                vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[ac * n + i];
+                                vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[ac * n + i];
+                            }
+                        }
+
+                        if (!isDiscoveredPtr[vertexAfterTransitionA])
+                        {
+                            isDiscoveredPtr[vertexAfterTransitionA] = true;
+                            isToBeProcessedDuringNextIteration[vertexAfterTransitionA] = true;
+                            addedSomethingThisRound[0] = true;
+
+                            if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
+                            {
+                                shortestSynchronizingWordLength[ac] = nextDistance;
+                                isSynchronizing[ac] = true;
+                                shouldStop[0] = true;
+                                break;
+                            }
+
+                        }
+
+                        if (!isDiscoveredPtr[vertexAfterTransitionB])
+                        {
+                            isDiscoveredPtr[vertexAfterTransitionB] = true;
+                            isToBeProcessedDuringNextIteration[vertexAfterTransitionB] = true;
+                            addedSomethingThisRound[0] = true;
+
+                            if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+                            {
+                                shortestSynchronizingWordLength[ac] = nextDistance;
+                                isSynchronizing[ac] = true;
+                                shouldStop[0] = true;
+                                break;
+                            }
+
+                        }
+                    }
+                    ++nextDistance;
+                    DeviceFunction.SyncThreads();
+                    if (!addedSomethingThisRound[0])
+                        break;
+                    addedSomethingThisRound[0] = false;
+                    DeviceFunction.SyncThreads();
+                }
+
+                // cleanup
+
                 for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                 {
-                    if (!isToBeProcessedDuringNextIteration[consideringVertex])
-                        continue;
-                    else
-                        isToBeProcessedDuringNextIteration[consideringVertex] = false;
-
-                    vertexAfterTransitionA = vertexAfterTransitionB = 0;
-
-                    for (int i = 0; i < n; i++)
-                    {
-                        if (0 != ((1 << i) & consideringVertex))
-                        {
-                            vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
-                            vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
-                        }
-                    }
-
-                    if (!isDiscoveredPtr[vertexAfterTransitionA])
-                    {
-                        isDiscoveredPtr[vertexAfterTransitionA] = true;
-                        isToBeProcessedDuringNextIteration[vertexAfterTransitionA] = true;
-
-                        if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
-                        {
-                            shortestSynchronizingWordLength[0] = nextDistance;
-                            isSynchronizing[0] = true;
-                            shouldStop[0] = true;
-                            break;
-                        }
-
-                    }
-
-                    if (!isDiscoveredPtr[vertexAfterTransitionB])
-                    {
-                        isDiscoveredPtr[vertexAfterTransitionB] = true;
-                        isToBeProcessedDuringNextIteration[vertexAfterTransitionB] = true;
-
-                        if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
-                        {
-                            shortestSynchronizingWordLength[0] = nextDistance;
-                            isSynchronizing[0] = true;
-                            shouldStop[0] = true;
-                            break;
-                        }
-
-                    }
+                    isDiscoveredPtr[consideringVertex] = false;
+                    isToBeProcessedDuringNextIteration[consideringVertex] = false;
+                    shouldStop[0] = false;
+                    correctlyProcessed = 0;
+                    nextDistance = 1;
+                    addedSomethingThisRound[0] = false;
                 }
-                ++nextDistance;
+                if (threadIdx.x == 0)
+                    isToBeProcessedDuringNextIteration[power - 1] = true;
                 DeviceFunction.SyncThreads();
             }
         }
