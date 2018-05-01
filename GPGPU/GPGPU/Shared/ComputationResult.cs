@@ -10,6 +10,7 @@ namespace GPGPU.Shared
     {
         public bool isSynchronizable;
         public bool[] shortestSynchronizingWord;
+        public int shortestSynchronizingWordLength;
         public BenchmarkResult benchmarkResult;
         public int queueBreadth;
         public ComputationType computationType;

@@ -11,7 +11,7 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputation GetLatestCPU() => new GPGPU.Version_1._0.CPU();
+        private IComputation GetLatestCPU() => new SlimCPU();
 
         [TestMethod]
         public void YoutubeExperimentalMathematicsSize3()
@@ -22,9 +22,9 @@ namespace AlgorithmCorrectnessTestProject
 
             Assert.IsNotNull(result);
             Assert.IsTrue(result.isSynchronizable);
-            Assert.IsNotNull(result.shortestSynchronizingWord);
-            Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual(result.shortestSynchronizingWord.Length, 4);
+            //Assert.IsNotNull(result.shortestSynchronizingWord);
+            //Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
+            Assert.AreEqual(result.shortestSynchronizingWordLength, 4);
         }
         [TestMethod]
         public void YoutubeExperimentalMathematicsSizeLarge()
@@ -36,9 +36,9 @@ namespace AlgorithmCorrectnessTestProject
 
             Assert.IsNotNull(result);
             Assert.IsTrue(result.isSynchronizable);
-            Assert.IsNotNull(result.shortestSynchronizingWord);
-            Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual(result.shortestSynchronizingWord.Length, (n - 1) * (n - 1));
+            //Assert.IsNotNull(result.shortestSynchronizingWord);
+            //Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
+            Assert.AreEqual(result.shortestSynchronizingWordLength, (n - 1) * (n - 1));
         }
 
     }

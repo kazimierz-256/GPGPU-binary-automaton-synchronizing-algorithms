@@ -8,13 +8,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GPGPU.CPU.Custom_queue
+namespace GPGPU
 {
-    class CPU_queue : IComputation
+    public class CPU : IComputation
     {
         private static readonly int mostProbablePowerSetCount = 1 << 13;
         private ushort[] previousVertexStatic = new ushort[mostProbablePowerSetCount];
-        private ushort[] distanceToVertexStatic = new ushort[mostProbablePowerSetCount];
         private bool[] previousLetterUsedEqualsBStatic = new bool[mostProbablePowerSetCount];
 
         public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
@@ -26,7 +25,6 @@ namespace GPGPU.CPU.Custom_queue
                         problemsToSolve[i],
                         true,
                         previousVertexStatic,
-                        distanceToVertexStatic,
                         previousLetterUsedEqualsBStatic))
                     .ToArray();
             }
@@ -35,7 +33,6 @@ namespace GPGPU.CPU.Custom_queue
                 var results = new ComputationResult[problemsToSolve.Length];
                 var reusableLengths = degreeOfParallelism;
                 var previousVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
-                var distanceToVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
                 var previousLetterUsedEqualsBReusables = Enumerable.Range(0, reusableLengths).Select(_ => new bool[mostProbablePowerSetCount]).ToArray();
 
 
@@ -77,7 +74,6 @@ namespace GPGPU.CPU.Custom_queue
                                 problem,
                                 true,
                                 previousVertexReusables[id],
-                                distanceToVertexReusables[id],
                                 previousLetterUsedEqualsBReusables[id]
                                 );
                             reusablesQueue.Enqueue(id);
@@ -96,7 +92,6 @@ namespace GPGPU.CPU.Custom_queue
             Problem problemToSolve,
             bool reuseResources = false,
             ushort[] previousVertexReusable = null,
-            ushort[] distanceToVertexReusable = null,
             bool[] previousLetterUsedEqualsBReusable = null
             )
         {
@@ -136,24 +131,17 @@ namespace GPGPU.CPU.Custom_queue
             benchmarkTiming.Stop();
 
 
-            var vertexQueue = new ushort[powerSetCount];
-            vertexQueue[0] = initialVertex;
-            var vertexQueueReadIndex = 0;
-            var vertexQueuePutIndex = 1;
-            var distanceQueue = new ushort[powerSetCount];
-            var distanceQueueReadIndex = 0;
-            var distanceQueuePutIndex = 1;
-            //distanceQueue[0] = 0;
+            var queue = new Queue<ushort>(n * 5);
+            queue.Enqueue(initialVertex);
 
             var discoveredSingleton = false;
             ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
             int targetIndexPlusOne;
-            ushort extractingBits;
+            int extractingBits;
             ushort firstSingleton = 0;
             ushort firstSingletonDistance = 0;
-            ushort distanceToConsideredVertex;
 
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
             var precomputedStateTransitioningMatrixB = new ushort[n + 1];
@@ -165,27 +153,28 @@ namespace GPGPU.CPU.Custom_queue
             }
 
             var maximumBreadth = 0;
-            var readPowerSets = 0;
-            var putPowerSets = 0;
-            while (vertexQueueReadIndex + readPowerSets * powerSetCount < vertexQueuePutIndex + putPowerSets * powerSetCount)
-            {
-                //if (queue.Count > maximumBreadth)
-                //    maximumBreadth = queue.Count;
+            ushort bumpUpVertex = 0;
+            ushort currentNextDistance = 1;
+            bool seekingFirstNext = true;
 
-                extractingBits = consideringVertex = vertexQueue[vertexQueueReadIndex++];
-                distanceToConsideredVertex = distanceQueue[distanceQueueReadIndex++];
+            while (queue.Count > 0)
+            {
+                if (queue.Count > maximumBreadth)
+                    maximumBreadth = queue.Count;
+
+                extractingBits = consideringVertex = queue.Dequeue();
+                if (consideringVertex == bumpUpVertex)
+                {
+                    ++currentNextDistance;
+                    seekingFirstNext = true;
+                }
+
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
                 // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                 // note: consideringVertex cannot ever be equal to 0
-                if (0 == (consideringVertex & (consideringVertex - 1)))
-                {
-                    discoveredSingleton = true;
-                    firstSingleton = consideringVertex;
-                    firstSingletonDistance = distanceToConsideredVertex;
-                    break;
-                }
+
                 // watch out for the index range in the for loop
                 for (int i = 1; i <= n; i++)
                 {
@@ -198,31 +187,43 @@ namespace GPGPU.CPU.Custom_queue
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
-                    distanceQueue[distanceQueuePutIndex++] = ((ushort)(distanceToConsideredVertex + 1));
-                    previousVertex[vertexAfterTransitionA] = consideringVertex;
+                    if (seekingFirstNext)
+                    {
+                        seekingFirstNext = false;
+                        bumpUpVertex = vertexAfterTransitionA;
+                    }
                     isDiscovered[vertexAfterTransitionA] = true;
+                    previousVertex[vertexAfterTransitionA] = consideringVertex;
                     previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
-                    vertexQueue[vertexQueuePutIndex++] = (vertexAfterTransitionA);
+                    queue.Enqueue(vertexAfterTransitionA);
+
+                    if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
+                    {
+                        discoveredSingleton = true;
+                        firstSingleton = vertexAfterTransitionA;
+                        firstSingletonDistance = currentNextDistance;
+                        break;
+                    }
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
-                    distanceQueue[distanceQueuePutIndex++] = ((ushort)(distanceToConsideredVertex + 1));
-                    previousVertex[vertexAfterTransitionB] = consideringVertex;
+                    if (seekingFirstNext)
+                    {
+                        seekingFirstNext = false;
+                        bumpUpVertex = vertexAfterTransitionB;
+                    }
                     isDiscovered[vertexAfterTransitionB] = true;
+                    previousVertex[vertexAfterTransitionB] = consideringVertex;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
-                    vertexQueue[vertexQueuePutIndex++] = (vertexAfterTransitionB);
-                }
-                if (distanceQueueReadIndex > powerSetCount)
-                {
-                    distanceQueueReadIndex -= powerSetCount;
-                    vertexQueueReadIndex -= powerSetCount;
-                    readPowerSets++;
-                }
-                if (distanceQueuePutIndex > powerSetCount)
-                {
-                    distanceQueuePutIndex -= powerSetCount;
-                    vertexQueuePutIndex -= powerSetCount;
-                    putPowerSets++;
+                    queue.Enqueue(vertexAfterTransitionB);
+
+                    if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+                    {
+                        discoveredSingleton = true;
+                        firstSingleton = vertexAfterTransitionB;
+                        firstSingletonDistance = currentNextDistance;
+                        break;
+                    }
                 }
             }
 
@@ -249,8 +250,8 @@ namespace GPGPU.CPU.Custom_queue
                     // everything is fine
                     result.isSynchronizable = true;
 
-                    int wordLength = firstSingletonDistance;
-                    int currentVertex = firstSingleton;
+                    var wordLength = firstSingletonDistance;
+                    var currentVertex = firstSingleton;
                     result.shortestSynchronizingWord = new bool[wordLength];
                     for (int i = wordLength - 1; i >= 0; i--)
                     {
@@ -266,6 +267,7 @@ namespace GPGPU.CPU.Custom_queue
                 result.isSynchronizable = false;
             }
 
+            result.shortestSynchronizingWordLength = firstSingletonDistance;
             result.benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
             result.benchmarkResult.totalTime = totalTiming.Elapsed;
             return result;
@@ -273,5 +275,3 @@ namespace GPGPU.CPU.Custom_queue
 
     }
 }
-
-
