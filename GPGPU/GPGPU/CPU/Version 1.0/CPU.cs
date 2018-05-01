@@ -110,7 +110,6 @@ namespace GPGPU.Version_1._0
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            ushort[] distanceToVertex;
             ushort[] previousVertex;
             bool[] previousLetterUsedEqualsB;
             benchmarkTiming.Start();
@@ -125,15 +124,12 @@ namespace GPGPU.Version_1._0
                 {
                     previousVertexReusable = new ushort[powerSetCount];
                     previousLetterUsedEqualsBReusable = new bool[powerSetCount];
-                    distanceToVertexReusable = new ushort[powerSetCount];
                 }
-                distanceToVertex = distanceToVertexReusable;
                 previousVertex = previousVertexReusable;
                 previousLetterUsedEqualsB = previousLetterUsedEqualsBReusable;
             }
             else
             {
-                distanceToVertex = new ushort[powerSetCount];
                 previousVertex = new ushort[powerSetCount];
                 previousLetterUsedEqualsB = new bool[powerSetCount];
             }
@@ -150,6 +146,7 @@ namespace GPGPU.Version_1._0
             int targetIndexPlusOne;
             int extractingBits;
             ushort firstSingleton = 0;
+            ushort firstSingletonDistance = 0;
             ushort nextDistance;
 
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
@@ -162,25 +159,28 @@ namespace GPGPU.Version_1._0
             }
 
             var maximumBreadth = 0;
+            ushort bumpUpVertex = 0;
+            ushort currentNextDistance = 1;
+            bool seekingFirstNext = true;
+
             while (queue.Count > 0)
             {
                 if (queue.Count > maximumBreadth)
                     maximumBreadth = queue.Count;
 
                 extractingBits = consideringVertex = queue.Dequeue();
-                nextDistance = distanceToVertex[consideringVertex];
-                ++nextDistance;
+                if (consideringVertex == bumpUpVertex)
+                {
+                    ++currentNextDistance;
+                    seekingFirstNext = true;
+                }
+
                 vertexAfterTransitionA = vertexAfterTransitionB = 0;
 
                 // check for singleton existance
                 // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                 // note: consideringVertex cannot ever be equal to 0
-                if (0 == (consideringVertex & (consideringVertex - 1)))
-                {
-                    discoveredSingleton = true;
-                    firstSingleton = consideringVertex;
-                    break;
-                }
+
                 // watch out for the index range in the for loop
                 for (int i = 1; i <= n; i++)
                 {
@@ -193,19 +193,43 @@ namespace GPGPU.Version_1._0
 
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
+                    if (seekingFirstNext)
+                    {
+                        seekingFirstNext = false;
+                        bumpUpVertex = vertexAfterTransitionA;
+                    }
                     isDiscovered[vertexAfterTransitionA] = true;
-                    distanceToVertex[vertexAfterTransitionA] = nextDistance;
                     previousVertex[vertexAfterTransitionA] = consideringVertex;
                     previousLetterUsedEqualsB[vertexAfterTransitionA] = false;
                     queue.Enqueue(vertexAfterTransitionA);
+
+                    if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
+                    {
+                        discoveredSingleton = true;
+                        firstSingleton = vertexAfterTransitionA;
+                        firstSingletonDistance = currentNextDistance;
+                        break;
+                    }
                 }
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
+                    if (seekingFirstNext)
+                    {
+                        seekingFirstNext = false;
+                        bumpUpVertex = vertexAfterTransitionB;
+                    }
                     isDiscovered[vertexAfterTransitionB] = true;
-                    distanceToVertex[vertexAfterTransitionB] = nextDistance;
                     previousVertex[vertexAfterTransitionB] = consideringVertex;
                     previousLetterUsedEqualsB[vertexAfterTransitionB] = true;
                     queue.Enqueue(vertexAfterTransitionB);
+
+                    if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+                    {
+                        discoveredSingleton = true;
+                        firstSingleton = vertexAfterTransitionB;
+                        firstSingletonDistance = currentNextDistance;
+                        break;
+                    }
                 }
             }
 
@@ -223,7 +247,7 @@ namespace GPGPU.Version_1._0
             if (discoveredSingleton)
             {
                 // watch out for off by one error!
-                if (distanceToVertex[firstSingleton] > maximumPermissibleWordLength)
+                if (firstSingletonDistance > maximumPermissibleWordLength)
                 {
                     throw new Exception("Cerny conjecture is false");
                 }
@@ -232,10 +256,9 @@ namespace GPGPU.Version_1._0
                     // everything is fine
                     result.isSynchronizable = true;
 
-                    int wordLength = distanceToVertex[firstSingleton];
                     int currentVertex = firstSingleton;
-                    result.shortestSynchronizingWord = new bool[wordLength];
-                    for (int i = wordLength - 1; i >= 0; i--)
+                    result.shortestSynchronizingWord = new bool[firstSingletonDistance];
+                    for (int i = firstSingletonDistance - 1; i >= 0; i--)
                     {
                         result.shortestSynchronizingWord[i] = previousLetterUsedEqualsB[currentVertex];
                         currentVertex = previousVertex[currentVertex];
