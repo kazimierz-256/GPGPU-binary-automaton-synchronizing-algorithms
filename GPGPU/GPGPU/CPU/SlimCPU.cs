@@ -55,22 +55,21 @@ namespace GPGPU
             ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
-            int targetIndexPlusOne;
             ushort firstSingletonDistance = 0;
 
-            var precomputedStateTransitioningMatrixA = new ushort[n][];
-            var precomputedStateTransitioningMatrixB = new ushort[n][];
+            var precomputedStateTransitioningMatrixA = new ushort[n];
+            var precomputedStateTransitioningMatrixB = new ushort[n];
 
             for (int i = 0; i < n; i++)
             {
-                precomputedStateTransitioningMatrixA[i] = new ushort[] { 0, (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]) };
-                precomputedStateTransitioningMatrixB[i] = new ushort[] { 0, (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]) };
+                precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
+                precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
             }
 
-            var maximumBreadth = 0;
+            //var maximumBreadth = 0;
             ushort currentNextDistance = 1;
-            ushort verticesUntilBump = ushort.MaxValue;
-            bool seekingFirstNext = true;
+            var verticesUntilBump = ushort.MaxValue;
+            var seekingFirstNext = true;
 
             benchmarkTiming.Start();
             while (queue.Count > 0)
@@ -94,9 +93,11 @@ namespace GPGPU
                 // watch out for the index range in the for loop
                 for (int i = 0; i < n; i++)
                 {
-                    targetIndexPlusOne = 1 & (consideringVertex >> i);
-                    vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i][targetIndexPlusOne];
-                    vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i][targetIndexPlusOne];
+                    if (0 != ((1 << i) & consideringVertex))
+                    {
+                        vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
+                        vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
+                    }
                 }
 
                 if (!isDiscovered[vertexAfterTransitionA])
@@ -117,6 +118,7 @@ namespace GPGPU
                         verticesUntilBump = (ushort)queue.Count;
                     }
                 }
+
                 if (!isDiscovered[vertexAfterTransitionB])
                 {
                     if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
@@ -144,7 +146,7 @@ namespace GPGPU
             {
                 benchmarkResult = new BenchmarkResult(),
                 computationType = ComputationType.CPU_Serial,
-                queueBreadth = maximumBreadth,
+                //queueBreadth = maximumBreadth,
                 size = n,
                 //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
             };
