@@ -69,7 +69,7 @@ namespace GPGPU
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
                 new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
-                sizeof(int) * 2 + 2 * sizeof(bool) + power * sizeof(bool) + power * sizeof(ushort) * 2
+                sizeof(int) * 2 + 2 * sizeof(bool) + power * sizeof(byte) + power * sizeof(ushort) * 2
             );
 #if (benchmark)
             benchmarkTiming.Start();
@@ -148,7 +148,7 @@ namespace GPGPU
                 .Ptr(1);
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
                 .Ptr(2 * 4).Volatile();
-            var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
+            var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<byte>())
                 .Ptr(2 * 4 + 1).Volatile();
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(2 * 2 + 1 + power / 2).Volatile();
@@ -158,7 +158,7 @@ namespace GPGPU
             if (threadIdx.x == 0)
             {
                 queueOdd[0] = (ushort)(power - 1);
-                isDiscoveredPtr[power - 1] = true;
+                isDiscoveredPtr[power - 1] = 1;
                 queueOddCount[0] = 1;
             }
             ushort nextDistance = 1;
@@ -170,7 +170,7 @@ namespace GPGPU
             var writingQueueCount = queueEvenCount;
 
             DeviceFunction.SyncThreads();
-            for (int ac = 0; ac < arrayCount[0]; ac++)
+            for (byte ac = 0, acp1 = 1; ac < arrayCount[0]; ac++, acp1++)
             {
                 while (readingQueueCount[0] > 0 && !shouldStop[0])
                 {
@@ -194,7 +194,7 @@ namespace GPGPU
                             }
                         }
 
-                        if (!isDiscoveredPtr[vertexAfterTransitionA])
+                        if (acp1 != isDiscoveredPtr[vertexAfterTransitionA])
                         {
                             if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
                             {
@@ -204,12 +204,12 @@ namespace GPGPU
                                 break;
                             }
 
-                            isDiscoveredPtr[vertexAfterTransitionA] = true;
+                            isDiscoveredPtr[vertexAfterTransitionA] = acp1;
                             var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
                         }
 
-                        if (!isDiscoveredPtr[vertexAfterTransitionB])
+                        if (acp1 != isDiscoveredPtr[vertexAfterTransitionB])
                         {
                             if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
                             {
@@ -219,7 +219,7 @@ namespace GPGPU
                                 break;
                             }
 
-                            isDiscoveredPtr[vertexAfterTransitionB] = true;
+                            isDiscoveredPtr[vertexAfterTransitionB] = acp1;
                             var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
                         }
@@ -240,21 +240,13 @@ namespace GPGPU
                 if (ac < arrayCount[0] - 1)
                 {
                     // cleanup
-                    int myPart = (power + blockDim.x - 1) / blockDim.x;
-                    int beginningPointer = threadIdx.x * myPart;
-                    int endingPointer = (threadIdx.x + 1) * myPart;
-                    if (power - 1 < endingPointer)
-                        endingPointer = power;
-                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
-                    {
-                        isDiscoveredPtr[consideringVertex] = false;
-                    }
                     if (threadIdx.x == 0)
                     {
                         shouldStop[0] = false;
                         queueEvenCount[0] = 0;
                         queueOddCount[0] = 1;
                         queueOdd[0] = (ushort)(power - 1);
+                        isDiscoveredPtr[power - 1] = (byte)(acp1 + 1);
                     }
                     nextDistance = 1;
                     DeviceFunction.SyncThreads();
