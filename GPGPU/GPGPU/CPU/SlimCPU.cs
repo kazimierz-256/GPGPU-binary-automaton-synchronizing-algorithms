@@ -36,7 +36,6 @@ namespace GPGPU
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
 
-
             var n = problemToSolve.size;
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
@@ -155,9 +154,7 @@ namespace GPGPU
                 result.isSynchronizable = true;
                 // watch out for off by one error!
                 if (firstSingletonDistance > maximumPermissibleWordLength)
-                {
                     throw new Exception("Cerny conjecture is false");
-                }
             }
             else
             {

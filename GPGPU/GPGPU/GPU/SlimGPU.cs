@@ -19,12 +19,12 @@ namespace GPGPU
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction, int warps = 32)
         {
-            var warps = 32; // dunno what to do with this guy
             var gpu = Gpu.Default;
             var n = problemsToSolve.First().size;
             var power = 1 << n;
+            var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
             var takeRatio = (problemsToSolve.Count() + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
@@ -39,24 +39,18 @@ namespace GPGPU
                 {
                     var matrixA = new int[problems.Length * n];
                     for (int problem = 0; problem < problems.Length; problem++)
-                    {
                         for (int i = 0; i < n; i++)
-                        {
                             matrixA[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixA[i]);
-                        }
-                    }
+
                     return matrixA;
                 }).ToArray();
             var precomputedStateTransitioningMatrixB = problemsPartitioned.Select(problems =>
             {
                 var matrixB = new int[problems.Length * n];
                 for (int problem = 0; problem < problems.Length; problem++)
-                {
                     for (int i = 0; i < n; i++)
-                    {
                         matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
-                    }
-                }
+
                 return matrixB;
             }).ToArray();
 
@@ -69,7 +63,7 @@ namespace GPGPU
 
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
-                new dim3(32 * warps, 1, 1),
+                new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
                 power * 3 + 1 + 1
             );
 
@@ -118,6 +112,9 @@ namespace GPGPU
                 Gpu.Free(item);
 
             foreach (var stream in streams) stream.Dispose();
+
+            if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
+                throw new Exception("Cerny conjecture is false");
 
             return results;
         }
@@ -220,8 +217,6 @@ namespace GPGPU
                 if (ac < arrayCount[0] - 1)
                 {
                     // cleanup
-                    //DeviceFunction.SyncThreads();
-
                     for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                     {
                         isDiscoveredPtr[consideringVertex] = false;

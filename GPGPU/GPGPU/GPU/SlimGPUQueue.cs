@@ -19,12 +19,12 @@ namespace GPGPU
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction, int warps = 12)
         {
-            var warps = 12; // dunno what to do with this guy
             var gpu = Gpu.Default;
             var n = problemsToSolve.First().size;
             var power = 1 << n;
+            var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
             var takeRatio = (problemsToSolve.Count() + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
@@ -118,6 +118,9 @@ namespace GPGPU
                 Gpu.Free(item);
 
             foreach (var stream in streams) stream.Dispose();
+
+            if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
+                throw new Exception("Cerny conjecture is false");
 
             return results;
         }
