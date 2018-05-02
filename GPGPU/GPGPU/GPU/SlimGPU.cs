@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Alea.CSharp;
 using Alea;
+using Alea.FSharp;
 
 namespace GPGPU
 {
@@ -15,19 +16,53 @@ namespace GPGPU
         public ComputationResult ComputeOne(Problem problemToSolve)
         => Compute(new[] { problemToSolve }, 1)[0];
 
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int streamCount)
         {
-            //Enumerable.Range(0, problemsToSolve.Length)
-            //.Select(i => ComputeOne(problemsToSolve[i]))
-            //.ToArray();
-
-
-            var warps = 32; // dunno what to do with this guy
+            var warps = 1; // dunno what to do with this guy
             var gpu = Gpu.Default;
             var n = problemsToSolve[0].size;
             var power = 1 << n;
 
-            // transform this into streams
+            var takeRatio = (problemsToSolve.Length + streamCount - 1) / streamCount;
+            var problemsPartitioned = Enumerable.Range(0, streamCount)
+                    .Select(i => problemsToSolve.Skip(streamCount * i)
+                    .Take(takeRatio)
+                    .ToArray())
+                .ToArray();
+
+            var streams = Enumerable.Range(0, streamCount).Select(_ => gpu.CreateStream()).ToArray();
+
+            var precomputedStateTransitioningMatrixA = problemsPartitioned.Select(problems =>
+                {
+                    var matrixA = new int[problems.Length * n];
+                    for (int problem = 0; problem < problems.Length; problem++)
+                    {
+                        for (int i = 0; i < n; i++)
+                        {
+                            matrixA[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixA[i]);
+                        }
+                    }
+                    return matrixA;
+                }).ToArray();
+            var precomputedStateTransitioningMatrixB = problemsPartitioned.Select(problems =>
+            {
+                var matrixB = new int[problems.Length * n];
+                for (int problem = 0; problem < problems.Length; problem++)
+                {
+                    for (int i = 0; i < n; i++)
+                    {
+                        matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
+                    }
+                }
+                return matrixB;
+            }).ToArray();
+
+
+            var gpuA = precomputedStateTransitioningMatrixA.Select(arg => gpu.Allocate(arg)).ToArray();
+            var gpuB = precomputedStateTransitioningMatrixB.Select(arg => gpu.Allocate(arg)).ToArray();
+            var shortestSynchronizingWordLength = Enumerable.Range(0, streamCount).Select(i => gpu.Allocate<int>(problemsToSolve.Length)).ToArray();
+            var isSynchronizable = Enumerable.Range(0, streamCount).Select(i => gpu.Allocate<bool>(problemsToSolve.Length)).ToArray();
+            var arrayCount = Enumerable.Range(0, streamCount).Select(i => gpu.Allocate(new[] { problemsToSolve.Length })).ToArray();
 
             var launchParameters = new LaunchParam(
                 1,
@@ -35,49 +70,48 @@ namespace GPGPU
                 power * 2 + 1 + 1
             );
 
-
-            var precomputedStateTransitioningMatrixA = new int[problemsToSolve.Length * n];
-            var precomputedStateTransitioningMatrixB = new int[problemsToSolve.Length * n];
-
-            for (int problem = 0; problem < problemsToSolve.Length; problem++)
+            for (var stream = 0; stream < streamCount; stream++)
             {
-                for (int i = 0; i < n; i++)
-                {
-                    precomputedStateTransitioningMatrixA[problem * n + i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixA[i]);
-                    precomputedStateTransitioningMatrixB[problem * n + i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixB[i]);
-                }
+                streams[stream].Copy(precomputedStateTransitioningMatrixA[stream], gpuA[stream]);
+                streams[stream].Copy(precomputedStateTransitioningMatrixB[stream], gpuB[stream]);
+                streams[stream].Launch(
+                    Kernel,
+                    launchParameters,
+                    arrayCount[stream],
+                    gpuA[stream],
+                    gpuB[stream],
+                    isSynchronizable[stream],
+                    shortestSynchronizingWordLength[stream]
+                    );
             }
 
-            var gpuA = gpu.Allocate(precomputedStateTransitioningMatrixA);
-            var gpuB = gpu.Allocate(precomputedStateTransitioningMatrixB);
-            var shortestSynchronizingWordLength = gpu.Allocate<int>(problemsToSolve.Length);
-            var isSynchronizable = gpu.Allocate<bool>(problemsToSolve.Length);
-            var arrayCount = gpu.Allocate(new[] { problemsToSolve.Length });
 
-            gpu.Launch(
-                Kernel,
-                launchParameters,
-                arrayCount,
-                gpuA,
-                gpuB,
-                isSynchronizable,
-                shortestSynchronizingWordLength
-                );
 
-            var results = Gpu.CopyToHost(isSynchronizable).Zip(Gpu.CopyToHost(shortestSynchronizingWordLength), (isSyncable, shortestWordLength)
-                => new ComputationResult()
-                {
-                    size = problemsToSolve[0].size,
-                    isSynchronizable = isSyncable,
-                    shortestSynchronizingWordLength = shortestWordLength
-                }
-                ).ToArray();
+            var results = Enumerable.Range(0, streamCount).SelectMany(i =>
+            {
+                return Gpu.CopyToHost(isSynchronizable[i])
+                        .Zip(Gpu.CopyToHost(shortestSynchronizingWordLength[i]), (isSyncable, shortestWordLength)
+                    => new ComputationResult()
+                    {
+                        size = problemsToSolve[0].size,
+                        isSynchronizable = isSyncable,
+                        shortestSynchronizingWordLength = shortestWordLength
+                    }
+                    ).ToArray();
+            }).ToArray();
 
-            Gpu.Free(gpuA);
-            Gpu.Free(gpuB);
-            Gpu.Free(shortestSynchronizingWordLength);
-            Gpu.Free(isSynchronizable);
-            Gpu.Free(arrayCount);
+            foreach (var stream in streams) stream.Dispose();
+
+            foreach (var item in gpuA)
+                Gpu.Free(item);
+            foreach (var item in gpuB)
+                Gpu.Free(item);
+            foreach (var item in shortestSynchronizingWordLength)
+                Gpu.Free(item);
+            foreach (var item in isSynchronizable)
+                Gpu.Free(item);
+            foreach (var item in arrayCount)
+                Gpu.Free(item);
 
             return results;
         }
