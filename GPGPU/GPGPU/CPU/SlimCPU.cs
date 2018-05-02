@@ -76,6 +76,7 @@ namespace GPGPU
                 //    maximumBreadth = queue.Count;
 
                 consideringVertex = queue.Dequeue();
+
                 if (--verticesUntilBump == 0)
                 {
                     ++currentNextDistance;

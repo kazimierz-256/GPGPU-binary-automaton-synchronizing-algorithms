@@ -24,9 +24,10 @@ namespace GPGPU
                 new CPU() as IComputable,
                 new SlimCPU() as IComputable,
                 new SlimGPU() as IComputable,
-                new SlimCPUGPU() as IComputable
+                //new SlimCPUGPU() as IComputable,
+                new SlimGPUQueue() as IComputable,
             };
-            const long initialProblemSamplingCount = 1 << 4;
+            const long initialProblemSamplingCount = 1 << 5;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -39,7 +40,7 @@ namespace GPGPU
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
-            for (int n = (int)doublePrecisionN; n < 140000; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
                 foreach (var solver in theSolver)
                     computeLoopUsing(solver);
@@ -79,7 +80,7 @@ namespace GPGPU
 
                     Console.WriteLine($"{solver.GetType().ToString()} {n} problems computed using {solver.GetBestParallelism()} processors in {computationElapsed.TotalMilliseconds:F2}ms. " +
                         $"Problems per second: {n / computationElapsed.TotalSeconds:F2}. " +
-                        $"Time per problem {computationElapsed.TotalMilliseconds / n:F5}ms");
+                        $"Time per problem {computationElapsed.TotalMilliseconds / n}ms");
 
                     //Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. " +
                     //    $"Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. " +

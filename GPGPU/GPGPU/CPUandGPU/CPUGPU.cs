@@ -12,15 +12,18 @@ namespace GPGPU.CPUandGPU
     class SlimCPUGPU : IComputable
     {
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
+            => Compute(problemsToSolve, degreeOfParallelism, .3f);
+
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism, float cpuPart = .3f)
         {
             IEnumerable<ComputationResult> cpuResults = null;
+            int cpuProblems = (int)Math.Floor(problemsToSolve.Count() * cpuPart);
             var thread = new Thread(() =>
             {
                 var cpu = new SlimCPU();
                 cpuResults = cpu
                    .Compute(problemsToSolve
-                       .Skip(problemsToSolve.Count() / 2)
-                       .Take((problemsToSolve.Count() + 1) / 2),
+                       .Take(cpuProblems),
                        cpu.GetBestParallelism());
             })
             {
@@ -28,12 +31,13 @@ namespace GPGPU.CPUandGPU
             };
             thread.Start();
 
-            var gpu = new SlimGPU();
-            var gpuResults = gpu.Compute(problemsToSolve.Take(problemsToSolve.Count() / 2), gpu.GetBestParallelism());
+            var gpu = new SlimGPUQueue();
+            var gpuResults = gpu.Compute(problemsToSolve.Skip(cpuProblems).Take(problemsToSolve.Count() - cpuProblems), gpu.GetBestParallelism());
 
             thread.Join();
-            return gpuResults.Concat(cpuResults).ToArray();
+            return cpuResults.Concat(gpuResults).ToArray();
         }
+
         public ComputationResult ComputeOne(Problem problemToSolve) => new SlimCPU().ComputeOne(problemToSolve);
         public int GetBestParallelism() => -1;
     }

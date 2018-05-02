@@ -89,6 +89,7 @@
     <Compile Include="Shared\Problem.cs" />
     <Compile Include="CPU\CPU.cs" />
     <Compile Include="GPU\SlimGPU.cs" />
+    <Compile Include="GPU\SlimGPUQueue.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
