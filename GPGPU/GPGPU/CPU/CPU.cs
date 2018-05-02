@@ -10,19 +10,19 @@ using System.Threading.Tasks;
 
 namespace GPGPU
 {
-    public class CPU : IComputation
+    public class CPU : IComputable
     {
         private static readonly int mostProbablePowerSetCount = 1 << 13;
         private ushort[] previousVertexStatic = new ushort[mostProbablePowerSetCount];
         private bool[] previousLetterUsedEqualsBStatic = new bool[mostProbablePowerSetCount];
 
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
         {
             if (degreeOfParallelism == 1)
             {
-                return Enumerable.Range(0, problemsToSolve.Length)
-                    .Select(i => ComputeOne(
-                        problemsToSolve[i],
+                return problemsToSolve
+                    .Select(problem => ComputeOne(
+                        problem,
                         true,
                         previousVertexStatic,
                         previousLetterUsedEqualsBStatic))
@@ -30,10 +30,11 @@ namespace GPGPU
             }
             else
             {
-                var results = new ComputationResult[problemsToSolve.Length];
                 var reusableLengths = degreeOfParallelism;
-                var previousVertexReusables = Enumerable.Range(0, reusableLengths).Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
-                var previousLetterUsedEqualsBReusables = Enumerable.Range(0, reusableLengths).Select(_ => new bool[mostProbablePowerSetCount]).ToArray();
+                var previousVertexReusables = Enumerable.Range(0, reusableLengths)
+                    .Select(_ => new ushort[mostProbablePowerSetCount]).ToArray();
+                var previousLetterUsedEqualsBReusables = Enumerable.Range(0, reusableLengths)
+                    .Select(_ => new bool[mostProbablePowerSetCount]).ToArray();
 
 
 

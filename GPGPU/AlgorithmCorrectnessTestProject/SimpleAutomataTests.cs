@@ -11,7 +11,7 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputation GetLatestComputingUnit() => new SlimGPU();
+        private IComputable GetLatestComputingUnit() => new SlimGPU();
 
         [TestMethod]
         public void YoutubeExperimentalMathematicsSize3()
@@ -29,7 +29,7 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void YoutubeExperimentalMathematicsSizeLarge()
         {
-            var n = 13;
+            var n = 6;
             var problem = ProblemGenerator.generateWorstCase(n);
 
             var result = GetLatestComputingUnit().ComputeOne(problem);

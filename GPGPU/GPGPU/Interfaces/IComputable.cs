@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace GPGPU.Interfaces
 {
-    public interface IComputation
+    public interface IComputable
     {
-        ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism);
+        ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism);
         ComputationResult ComputeOne(Problem problemToSolve);
         int GetBestParallelism();
     }

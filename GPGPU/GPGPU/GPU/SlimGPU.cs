@@ -11,19 +11,19 @@ using Alea.FSharp;
 
 namespace GPGPU
 {
-    public class SlimGPU : IComputation
+    public class SlimGPU : IComputable
     {
         public ComputationResult ComputeOne(Problem problemToSolve)
         => Compute(new[] { problemToSolve }, 1)[0];
 
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int streamCount)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
         {
             var warps = 32; // dunno what to do with this guy
             var gpu = Gpu.Default;
-            var n = problemsToSolve[0].size;
+            var n = problemsToSolve.First().size;
             var power = 1 << n;
 
-            var takeRatio = (problemsToSolve.Length + streamCount - 1) / streamCount;
+            var takeRatio = (problemsToSolve.Count() + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
                     .Select(i => problemsToSolve.Skip(streamCount * i)
                     .Take(takeRatio)
@@ -65,9 +65,9 @@ namespace GPGPU
             var arrayCount = problemsPartitioned.Select(problems => gpu.Allocate(new[] { problems.Length })).ToArray();
 
             var launchParameters = new LaunchParam(
-                1,
-                32 * warps,
-                power * 2 + 1 + 1
+                new dim3(1, 1, 1),
+                new dim3(32 * warps, 1, 1),
+                power * 3 + 1 + 1
             );
 
             for (var stream = 0; stream < streamCount; stream++)
@@ -94,7 +94,7 @@ namespace GPGPU
                         .Zip(Gpu.CopyToHost(shortestSynchronizingWordLength[i]), (isSyncable, shortestWordLength)
                     => new ComputationResult()
                     {
-                        size = problemsToSolve[0].size,
+                        size = problemsToSolve.First().size,
                         isSynchronizable = isSyncable,
                         shortestSynchronizingWordLength = shortestWordLength
                     }
@@ -124,17 +124,17 @@ namespace GPGPU
             bool[] isSynchronizing,
             int[] shortestSynchronizingWordLength)
         {
-            //blockDim.x, blockDim.y
             var n = precomputedStateTransitioningMatrixA.Length / arrayCount[0];
             var power = 1 << n;
 
             var ptr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>());
             var isDiscoveredPtr = ptr.Volatile();
             var isToBeProcessedDuringNextIteration = ptr.Ptr(power).Volatile();
-            var shouldStop = ptr.Ptr(power * 2).Volatile();
-            var addedSomethingThisRound = ptr.Ptr(power * 2 + 1).Volatile();
+            var isToBeProcessedDuringNextIterationOdd = ptr.Ptr(power * 2).Volatile();
+            var shouldStop = ptr.Ptr(power * 3).Volatile();
+            var addedSomethingThisRound = ptr.Ptr(power * 3 + 1).Volatile();
             if (threadIdx.x == 0)
-                isToBeProcessedDuringNextIteration[power - 1] = true;
+                isToBeProcessedDuringNextIterationOdd[power - 1] = true;
             ushort nextDistance = 1;
             int vertexAfterTransitionA, vertexAfterTransitionB;
             int myPart = (power + blockDim.x - 1) / blockDim.x;
@@ -146,16 +146,18 @@ namespace GPGPU
 
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
-                // what if it is not synchronizable
                 while (correctlyProcessed < endingPointer - beginningPointer && !shouldStop[0])
                 {
+                    var nextIterationRead = nextDistance % 2 == 0 ? isToBeProcessedDuringNextIteration : isToBeProcessedDuringNextIterationOdd;
+                    var nextIterationWrite = nextDistance % 2 == 1 ? isToBeProcessedDuringNextIteration : isToBeProcessedDuringNextIterationOdd;
+
                     for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                     {
-                        if (!isToBeProcessedDuringNextIteration[consideringVertex])
+                        if (!nextIterationRead[consideringVertex])
                             continue;
                         else
                         {
-                            isToBeProcessedDuringNextIteration[consideringVertex] = false;
+                            nextIterationRead[consideringVertex] = false;
                             ++correctlyProcessed;
                         }
 
@@ -173,7 +175,7 @@ namespace GPGPU
                         if (!isDiscoveredPtr[vertexAfterTransitionA])
                         {
                             isDiscoveredPtr[vertexAfterTransitionA] = true;
-                            isToBeProcessedDuringNextIteration[vertexAfterTransitionA] = true;
+                            nextIterationWrite[vertexAfterTransitionA] = true;
                             addedSomethingThisRound[0] = true;
 
                             if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
@@ -189,7 +191,7 @@ namespace GPGPU
                         if (!isDiscoveredPtr[vertexAfterTransitionB])
                         {
                             isDiscoveredPtr[vertexAfterTransitionB] = true;
-                            isToBeProcessedDuringNextIteration[vertexAfterTransitionB] = true;
+                            nextIterationWrite[vertexAfterTransitionB] = true;
                             addedSomethingThisRound[0] = true;
 
                             if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
@@ -206,26 +208,32 @@ namespace GPGPU
                     DeviceFunction.SyncThreads();
                     if (!addedSomethingThisRound[0])
                         break;
+                    DeviceFunction.SyncThreads();
                     addedSomethingThisRound[0] = false;
                     DeviceFunction.SyncThreads();
                 }
 
-                // cleanup
-
-                for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
+                if (ac < arrayCount[0] - 1)
                 {
-                    isDiscoveredPtr[consideringVertex] = false;
-                    isToBeProcessedDuringNextIteration[consideringVertex] = false;
-                    shouldStop[0] = false;
-                    correctlyProcessed = 0;
-                    nextDistance = 1;
-                    addedSomethingThisRound[0] = false;
+                    // cleanup
+                    //DeviceFunction.SyncThreads();
+
+                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
+                    {
+                        isDiscoveredPtr[consideringVertex] = false;
+                        isToBeProcessedDuringNextIteration[consideringVertex] = false;
+                        isToBeProcessedDuringNextIterationOdd[consideringVertex] = false;
+                        shouldStop[0] = false;
+                        correctlyProcessed = 0;
+                        nextDistance = 1;
+                        addedSomethingThisRound[0] = false;
+                    }
+                    if (threadIdx.x == 0)
+                        isToBeProcessedDuringNextIterationOdd[power - 1] = true;
+                    DeviceFunction.SyncThreads();
                 }
-                if (threadIdx.x == 0)
-                    isToBeProcessedDuringNextIteration[power - 1] = true;
-                DeviceFunction.SyncThreads();
             }
         }
-        public int GetBestParallelism() => 4;
+        public int GetBestParallelism() => 3;
     }
 }

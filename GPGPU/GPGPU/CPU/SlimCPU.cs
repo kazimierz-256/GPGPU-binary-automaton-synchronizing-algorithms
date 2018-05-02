@@ -10,20 +10,18 @@ using System.Threading.Tasks;
 
 namespace GPGPU
 {
-    public class SlimCPU : IComputation
+    public class SlimCPU : IComputable
     {
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
         {
             if (degreeOfParallelism == 1)
             {
-                return Enumerable.Range(0, problemsToSolve.Length)
-                    .Select(i => ComputeOne(problemsToSolve[i]))
+                return problemsToSolve
+                    .Select(problem => ComputeOne(problem))
                     .ToArray();
             }
             else
             {
-                var results = new ComputationResult[problemsToSolve.Length];
-
                 return problemsToSolve
                     .AsParallel()
                     .WithDegreeOfParallelism(degreeOfParallelism)

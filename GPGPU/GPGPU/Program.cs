@@ -1,4 +1,5 @@
-﻿using GPGPU.Interfaces;
+﻿using GPGPU.CPUandGPU;
+using GPGPU.Interfaces;
 using GPGPU.Problem_generator;
 using GPGPU.Result_veryfier;
 using GPGPU.Shared;
@@ -18,8 +19,14 @@ namespace GPGPU
         {
             #region Program definitions
             const int problemSize = 13;
-            IComputation theSolver = new SlimCPU();
-            const long initialProblemSamplingCount = 1 << 10;
+            var theSolver = new[]
+            {
+                new CPU() as IComputable,
+                new SlimCPU() as IComputable,
+                new SlimGPU() as IComputable,
+                new SlimCPUGPU() as IComputable
+            };
+            const long initialProblemSamplingCount = 1 << 4;
             double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -29,20 +36,21 @@ namespace GPGPU
             var version = theSolver.GetType().Namespace;
             var csvBuilder = new StringBuilder("problemcount,cputime,gputime,cpugpucombinedtime");
             var resultsDictionary = new List<ComputationResult>();
-            var degreeOfParallelism = theSolver.GetBestParallelism();
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
-            for (int n = (int)doublePrecisionN; n < 1000000; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            for (int n = (int)doublePrecisionN; n < 140000; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
-                computeLoopUsing(theSolver);
-                void computeLoopUsing(IComputation solver)
+                foreach (var solver in theSolver)
+                    computeLoopUsing(solver);
+
+                void computeLoopUsing(IComputable solver)
                 {
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
                     //var problems = new[] { ProblemGenerator.generateWorstCase(problemSize) };
 
                     watch.Start();
-                    var results = solver.Compute(problems, degreeOfParallelism);
+                    var results = solver.Compute(problems, solver.GetBestParallelism());
                     watch.Stop();
 
                     var computationElapsed = watch.Elapsed;
@@ -69,7 +77,7 @@ namespace GPGPU
 
                     resultsDictionary.AddRange(results);
 
-                    Console.WriteLine($"{n} problems computed using {degreeOfParallelism} processors in {computationElapsed.TotalMilliseconds:F2}ms. " +
+                    Console.WriteLine($"{solver.GetType().ToString()} {n} problems computed using {solver.GetBestParallelism()} processors in {computationElapsed.TotalMilliseconds:F2}ms. " +
                         $"Problems per second: {n / computationElapsed.TotalSeconds:F2}. " +
                         $"Time per problem {computationElapsed.TotalMilliseconds / n:F5}ms");
 
