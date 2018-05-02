@@ -27,7 +27,7 @@ namespace GPGPU
                 //new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 18;
+            const long initialProblemSamplingCount = 1 << 17;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 

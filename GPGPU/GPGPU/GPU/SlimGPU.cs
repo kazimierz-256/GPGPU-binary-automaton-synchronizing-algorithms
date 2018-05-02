@@ -217,14 +217,12 @@ namespace GPGPU
                     {
                         isDiscoveredPtr[consideringVertex] = false;
                         isToBeProcessedDuringNextIteration[consideringVertex] = false;
-                        isToBeProcessedDuringNextIterationOdd[consideringVertex] = false;
+                        isToBeProcessedDuringNextIterationOdd[consideringVertex] = consideringVertex == power - 1;
                         shouldStop[0] = false;
                         correctlyProcessed = 0;
                         nextDistance = 1;
                         addedSomethingThisRound[0] = false;
                     }
-                    if (threadIdx.x == 0)
-                        isToBeProcessedDuringNextIterationOdd[power - 1] = true;
                     DeviceFunction.SyncThreads();
                 }
             }

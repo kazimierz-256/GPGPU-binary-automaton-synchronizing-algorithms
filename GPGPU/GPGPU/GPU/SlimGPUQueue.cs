@@ -243,7 +243,7 @@ namespace GPGPU
                     int myPart = (power + blockDim.x - 1) / blockDim.x;
                     int beginningPointer = threadIdx.x * myPart;
                     int endingPointer = (threadIdx.x + 1) * myPart;
-                    if (power < endingPointer)
+                    if (power - 1 < endingPointer)
                         endingPointer = power;
                     for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                     {
@@ -252,7 +252,9 @@ namespace GPGPU
                     if (threadIdx.x == 0)
                     {
                         shouldStop[0] = false;
-                        queueEvenCount[0] = queueOddCount[0] = 0;
+                        queueEvenCount[0] = 0;
+                        queueOddCount[0] = 1;
+                        queueOdd[0] = (ushort)(power - 1);
                     }
                     nextDistance = 1;
                     DeviceFunction.SyncThreads();
