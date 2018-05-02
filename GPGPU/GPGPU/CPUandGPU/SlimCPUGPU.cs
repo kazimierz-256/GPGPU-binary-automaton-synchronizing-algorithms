@@ -7,9 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GPGPU.CPUandGPU
+namespace GPGPU
 {
-    class SlimCPUGPU : IComputable
+    public class SlimCPUGPU : IComputable
     {
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
             => Compute(problemsToSolve, degreeOfParallelism, .3f);

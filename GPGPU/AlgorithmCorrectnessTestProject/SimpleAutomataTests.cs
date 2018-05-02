@@ -1,7 +1,6 @@
 ﻿using System;
 using GPGPU;
 using GPGPU.Interfaces;
-using GPGPU.Problem_generator;
 using GPGPU.Result_veryfier;
 using GPGPU.Shared;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -16,7 +15,7 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void YoutubeExperimentalMathematicsSize3()
         {
-            var problem = ProblemGenerator.generateWorstCase(3);
+            var problem = Problem.GenerateWorstCase(3);
 
             var result = GetLatestComputingUnit().ComputeOne(problem);
 
@@ -30,7 +29,7 @@ namespace AlgorithmCorrectnessTestProject
         public void YoutubeExperimentalMathematicsSizeLarge()
         {
             var n = 13;
-            var problem = ProblemGenerator.generateWorstCase(n);
+            var problem = Problem.GenerateWorstCase(n);
 
             var result = GetLatestComputingUnit().ComputeOne(problem);
 

@@ -35,13 +35,15 @@ namespace GPGPU
 
             var takeRatio = (problemsToSolve.Count() + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
-                    .Select(i => problemsToSolve.Skip(streamCount * i)
-                    .Take(takeRatio)
-                    .ToArray()).Where(partition => partition.Length > 0)
+                    .Select(i => problemsToSolve.Skip(takeRatio * i)
+                        .Take(takeRatio)
+                        .ToArray())
+                    .Where(partition => partition.Length > 0)
                 .ToArray();
             streamCount = problemsPartitioned.Length;
 
-            var streams = Enumerable.Range(0, streamCount).Select(_ => gpu.CreateStream()).ToArray();
+            var streams = Enumerable.Range(0, streamCount)
+                .Select(_ => gpu.CreateStream()).ToArray();
 
             var precomputedStateTransitioningMatrixA = problemsPartitioned.Select(problems =>
             {
@@ -98,27 +100,27 @@ namespace GPGPU
 #if (benchmark)
             benchmarkTiming.Stop();
 #endif
-            var results = Enumerable.Range(0, streamCount).SelectMany(i =>
-            {
-                return Gpu.CopyToHost(isSynchronizable[i])
+            var results = Enumerable.Range(0, streamCount).SelectMany(i
+            => Gpu.CopyToHost(isSynchronizable[i])
                         .Zip(Gpu.CopyToHost(shortestSynchronizingWordLength[i]), (isSyncable, shortestWordLength)
-                    => new ComputationResult()
-                    {
-                        size = problemsToSolve.First().size,
-                        isSynchronizable = isSyncable,
-                        shortestSynchronizingWordLength = shortestWordLength
-                    }
-                    ).ToArray();
-            }).ToArray();
+                        => new ComputationResult()
+                        {
+                            size = problemsToSolve.First().size,
+                            isSynchronizable = isSyncable,
+                            shortestSynchronizingWordLength = shortestWordLength
+                        }
+                        ).ToArray()
+            ).ToArray();
 
-            foreach (var item in gpuA.AsEnumerable<Array>()
+            foreach (var array in gpuA.AsEnumerable<Array>()
                 .Concat(gpuB)
                 .Concat(shortestSynchronizingWordLength)
                 .Concat(isSynchronizable)
                 .Concat(arrayCount))
-                Gpu.Free(item);
+                Gpu.Free(array);
 
-            foreach (var stream in streams) stream.Dispose();
+            foreach (var stream in streams)
+                stream.Dispose();
 
             if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
                 throw new Exception("Cerny conjecture is false");
@@ -150,7 +152,7 @@ namespace GPGPU
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
                 .Ptr(2 * 4).Volatile();
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr(2 * 4 + 1).Volatile();
+                .Ptr(2 * 4 + 2).Volatile();
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(2 * 2 + 1 + power / 2).Volatile();
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
@@ -170,7 +172,7 @@ namespace GPGPU
             var readingQueueCount = queueOddCount;
             var writingQueueCount = queueEvenCount;
             int index, anotherIndex;
-            DeviceFunction.ThreadFenchBlock();
+            DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
                 index = ac * n;
@@ -191,8 +193,10 @@ namespace GPGPU
                         {
                             if (0 != ((1 << i) & consideringVertex))
                             {
-                                vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[anotherIndex];
-                                vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[anotherIndex];
+                                vertexAfterTransitionA |=
+                                    precomputedStateTransitioningMatrixA[anotherIndex];
+                                vertexAfterTransitionB |=
+                                   precomputedStateTransitioningMatrixB[anotherIndex];
                             }
                         }
 
@@ -226,7 +230,7 @@ namespace GPGPU
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
                         }
                     }
-                    DeviceFunction.ThreadFenchBlock();
+                    DeviceFunction.SyncThreads();
                     if (threadIdx.x == 0)
                     {
                         readingQueueCount[0] = 0;
@@ -236,7 +240,7 @@ namespace GPGPU
                     writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
                     readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
                     writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
-                    DeviceFunction.ThreadFenchBlock();
+                    DeviceFunction.SyncThreads();
                 }
 
                 if (ac < arrayCount[0] - 1)
@@ -259,7 +263,7 @@ namespace GPGPU
                         queueOdd[0] = (ushort)(power - 1);
                     }
                     nextDistance = 1;
-                    DeviceFunction.ThreadFenchBlock();
+                    DeviceFunction.SyncThreads();
                 }
             }
         }

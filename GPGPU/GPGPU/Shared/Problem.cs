@@ -12,7 +12,25 @@ namespace GPGPU.Shared
         public int[] stateTransitioningMatrixB;
         public int size;
 
-        internal static Problem[] GetArrayOfProblems(int problemCount, int problemSize, int seed)
+        public static Problem GenerateWorstCase(int n)
+        {
+            if (n < 3)
+                throw new Exception("wrong number!");
+
+            var problem = new Problem
+            {
+                size = n,
+                stateTransitioningMatrixA = Enumerable.Range(0, n)
+                .Select(i => i == 0 ? 1 : i)
+                .ToArray(),
+                stateTransitioningMatrixB = Enumerable.Range(0, n)
+                .Select(i => (i + 1) == n ? 0 : (i + 1))
+                .ToArray()
+            };
+            return problem;
+        }
+
+        public static Problem[] GetArrayOfProblems(int problemCount, int problemSize, int seed)
         {
             var random = new Random(seed);
             return Enumerable.Range(0, problemCount).Select(
@@ -20,7 +38,7 @@ namespace GPGPU.Shared
                  ).ToArray();
         }
 
-        internal static Problem GenerateProblem(int problemSize, int seed)
+        public static Problem GenerateProblem(int problemSize, int seed)
         {
             var random = new Random(seed);
             var problem = new Problem

@@ -28,7 +28,7 @@ namespace GPGPU
 
             var takeRatio = (problemsToSolve.Count() + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
-                    .Select(i => problemsToSolve.Skip(streamCount * i)
+                    .Select(i => problemsToSolve.Skip(takeRatio * i)
                     .Take(takeRatio)
                     .ToArray()).Where(partition => partition.Length > 0)
                 .ToArray();
@@ -101,14 +101,15 @@ namespace GPGPU
                     ).ToArray();
             }).ToArray();
 
-            foreach (var item in gpuA.AsEnumerable<Array>()
+            foreach (var array in gpuA.AsEnumerable<Array>()
                 .Concat(gpuB)
                 .Concat(shortestSynchronizingWordLength)
                 .Concat(isSynchronizable)
                 .Concat(arrayCount))
-                Gpu.Free(item);
+                Gpu.Free(array);
 
-            foreach (var stream in streams) stream.Dispose();
+            foreach (var stream in streams)
+                stream.Dispose();
 
             if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
                 throw new Exception("Cerny conjecture is false");
@@ -143,7 +144,7 @@ namespace GPGPU
             if (power < endingPointer)
                 endingPointer = power;
 
-            DeviceFunction.ThreadFenchBlock();
+            DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
                 while (correctlyProcessed < endingPointer - beginningPointer && !shouldStop[0])
@@ -205,12 +206,12 @@ namespace GPGPU
                     }
                     ++nextDistance;
                     //TODO: efficiency: should count up idle threads, if it is maximum, it means the graph is not synchronizable
-                    DeviceFunction.ThreadFenchBlock();
+                    DeviceFunction.SyncThreads();
                     if (!addedSomethingThisRound[0])
                         break;
                     DeviceFunction.ThreadFenchBlock();
                     addedSomethingThisRound[0] = false;
-                    DeviceFunction.ThreadFenchBlock();
+                    DeviceFunction.SyncThreads();
                 }
 
                 if (ac < arrayCount[0] - 1)
@@ -226,7 +227,7 @@ namespace GPGPU
                         nextDistance = 1;
                         addedSomethingThisRound[0] = false;
                     }
-                    DeviceFunction.ThreadFenchBlock();
+                    DeviceFunction.SyncThreads();
                 }
             }
         }

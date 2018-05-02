@@ -1,6 +1,4 @@
-﻿using GPGPU.CPUandGPU;
-using GPGPU.Interfaces;
-using GPGPU.Problem_generator;
+﻿using GPGPU.Interfaces;
 using GPGPU.Result_veryfier;
 using GPGPU.Shared;
 using LinqStatistics;
@@ -23,7 +21,7 @@ namespace GPGPU
             {
                 //new CPU(),
                 new SlimCPU(),
-                //new SlimGPU(),
+                //new SlimGPU(),// memory issues...
                 //new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };
@@ -32,6 +30,7 @@ namespace GPGPU
             #endregion
 
             const int problemSeed = 1234567;
+            var random = new Random(problemSeed);
             var watch = new Stopwatch();
 
             var version = theSolver.GetType().Namespace;
@@ -42,6 +41,7 @@ namespace GPGPU
             double doublePrecisionN = initialProblemSamplingCount;
             for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
+                var localSeed = random.Next();
                 foreach (var solver in theSolver)
                     computeLoopUsing(solver);
 
@@ -49,8 +49,8 @@ namespace GPGPU
                 Console.WriteLine();
                 void computeLoopUsing(IComputable solver)
                 {
-                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
-                    //var problems = new[] { ProblemGenerator.generateWorstCase(problemSize) };
+                    var problems = Problem.GetArrayOfProblems(n, problemSize, localSeed);
+                    //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
 
                     watch.Start();
                     var results = solver.Compute(problems, solver.GetBestParallelism());

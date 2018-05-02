@@ -6,9 +6,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GPGPU.CPUandGPU
+namespace GPGPU
 {
-    class SlimCPUGPUInbetween : IComputable
+    public class SlimCPUGPUInbetween : IComputable
     {
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
             => Compute(problemsToSolve, degreeOfParallelism, .5f);
