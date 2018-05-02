@@ -19,13 +19,13 @@ namespace GPGPU
         {
             #region Program definitions
             const int problemSize = 13;
-            var theSolver = new[]
+            var theSolver = new IComputable[]
             {
-                //new CPU() as IComputable,
-                //new SlimCPU() as IComputable,
-                //new SlimGPU() as IComputable,
-                //new SlimCPUGPU() as IComputable,
-                new SlimGPUQueue() as IComputable,
+                //new CPU(),
+                new SlimCPU(),
+                //new SlimGPU(),
+                //new SlimCPUGPU(),
+                new SlimGPUQueue(),
             };
             const long initialProblemSamplingCount = 1 << 17;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
