@@ -169,10 +169,11 @@ namespace GPGPU
             var writingQueue = queueEven;
             var readingQueueCount = queueOddCount;
             var writingQueueCount = queueEvenCount;
-
+            int index, anotherIndex;
             DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
+                index = ac * n;
                 while (readingQueueCount[0] > 0 && !shouldStop[0])
                 {
                     int myPart = (readingQueueCount[0] + blockDim.x - 1) / blockDim.x;
@@ -185,13 +186,13 @@ namespace GPGPU
                     {
                         int consideringVertex = readingQueue[iter];
                         vertexAfterTransitionA = vertexAfterTransitionB = 0;
-
-                        for (int i = 0; i < n; i++)
+                        anotherIndex = index;
+                        for (int i = 0; i < n; i++, anotherIndex++)
                         {
                             if (0 != ((1 << i) & consideringVertex))
                             {
-                                vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[ac * n + i];
-                                vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[ac * n + i];
+                                vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[anotherIndex];
+                                vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[anotherIndex];
                             }
                         }
 
