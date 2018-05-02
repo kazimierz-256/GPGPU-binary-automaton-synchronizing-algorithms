@@ -30,8 +30,9 @@ namespace GPGPU
             var problemsPartitioned = Enumerable.Range(0, streamCount)
                     .Select(i => problemsToSolve.Skip(streamCount * i)
                     .Take(takeRatio)
-                    .ToArray())
+                    .ToArray()).Where(partition => partition.Length > 0)
                 .ToArray();
+            streamCount = problemsPartitioned.Length;
 
             var streams = Enumerable.Range(0, streamCount).Select(_ => gpu.CreateStream()).ToArray();
 
