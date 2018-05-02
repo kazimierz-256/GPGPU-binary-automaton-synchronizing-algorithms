@@ -76,7 +76,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CPUandGPU\CPUGPU.cs" />
+    <Compile Include="CPUandGPU\SlimCPUGPU.cs" />
+    <Compile Include="CPUandGPU\SlimCPUGPUInbetween.cs" />
     <Compile Include="CPU\SlimCPU.cs" />
     <Compile Include="Interfaces\IComputable.cs" />
     <Compile Include="Problem generator\ProblemGenerator.cs" />

@@ -17,8 +17,11 @@ namespace GPGPU
         => Compute(new[] { problemToSolve }, 1)[0];
 
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
+            => Compute(problemsToSolve, streamCount, null);
+
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction)
         {
-            var warps = 16; // dunno what to do with this guy
+            var warps = 12; // dunno what to do with this guy
             var gpu = Gpu.Default;
             var n = problemsToSolve.First().size;
             var power = 1 << n;
@@ -66,8 +69,8 @@ namespace GPGPU
 
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
-                new dim3(32 * warps, 1, 1),
-                sizeof(int) * 3 + power * sizeof(bool) + power * sizeof(ushort) * 2
+                new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
+                sizeof(int) * 2 + 2 * sizeof(bool) + power * sizeof(bool) + power * sizeof(ushort) * 2
             );
 
             for (var stream = 0; stream < streamCount; stream++)
@@ -84,6 +87,8 @@ namespace GPGPU
                     shortestSynchronizingWordLength[stream]
                     );
             }
+
+            asyncAction?.Invoke();
 
             foreach (var stream in streams)
                 stream.Synchronize();
@@ -131,14 +136,14 @@ namespace GPGPU
                 .Ptr(0);
             var queueOddCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(1);
-            var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                .Ptr(2).Volatile();
+            var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
+                .Ptr(2 * 4).Volatile();
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr(3 * 4).Volatile();
+                .Ptr(2 * 4 + 1).Volatile();
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(3 * 2 + power / 2).Volatile();
+                .Ptr(2 * 2 + 1 + power / 2).Volatile();
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(3 * 2 + power / 2 * (1 + 2)).Volatile();
+                .Ptr(2 * 2 + 1 + power / 2 + power).Volatile();
 
             if (threadIdx.x == 0)
             {
@@ -157,7 +162,7 @@ namespace GPGPU
             DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
-                while (readingQueueCount[0] > 0 && shouldStop[0] == 0)
+                while (readingQueueCount[0] > 0 && !shouldStop[0])
                 {
                     int myPart = (readingQueueCount[0] + blockDim.x - 1) / blockDim.x;
                     int beginningPointer = threadIdx.x * myPart;
@@ -185,7 +190,7 @@ namespace GPGPU
                             {
                                 shortestSynchronizingWordLength[ac] = nextDistance;
                                 isSynchronizing[ac] = true;
-                                shouldStop[0] = 1;
+                                shouldStop[0] = true;
                                 break;
                             }
 
@@ -200,7 +205,7 @@ namespace GPGPU
                             {
                                 shortestSynchronizingWordLength[ac] = nextDistance;
                                 isSynchronizing[ac] = true;
-                                shouldStop[0] = 1;
+                                shouldStop[0] = true;
                                 break;
                             }
 
@@ -236,7 +241,7 @@ namespace GPGPU
                     }
                     if (threadIdx.x == 0)
                     {
-                        shouldStop[0] = 0;
+                        shouldStop[0] = false;
                         queueEvenCount[0] = queueOddCount[0] = 0;
                     }
                     nextDistance = 1;

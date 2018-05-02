@@ -17,6 +17,9 @@ namespace GPGPU
         => Compute(new[] { problemToSolve }, 1)[0];
 
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
+            => Compute(problemsToSolve, streamCount, null);
+
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction)
         {
             var warps = 32; // dunno what to do with this guy
             var gpu = Gpu.Default;
@@ -84,6 +87,8 @@ namespace GPGPU
                     shortestSynchronizingWordLength[stream]
                     );
             }
+
+            asyncAction?.Invoke();
 
             foreach (var stream in streams)
                 stream.Synchronize();

@@ -23,8 +23,8 @@ namespace GPGPU
             {
                 new CPU() as IComputable,
                 new SlimCPU() as IComputable,
-                new SlimGPU() as IComputable,
-                //new SlimCPUGPU() as IComputable,
+                //new SlimGPU() as IComputable,
+                new SlimCPUGPU() as IComputable,
                 new SlimGPUQueue() as IComputable,
             };
             const long initialProblemSamplingCount = 1 << 5;
