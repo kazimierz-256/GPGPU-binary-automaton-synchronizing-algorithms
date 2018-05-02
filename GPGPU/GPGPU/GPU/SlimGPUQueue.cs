@@ -1,4 +1,5 @@
-﻿using GPGPU.Interfaces;
+﻿#define benchmark
+using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
 using System.Collections.Generic;
@@ -8,6 +9,7 @@ using System.Threading.Tasks;
 using Alea.CSharp;
 using Alea;
 using Alea.FSharp;
+using System.Diagnostics;
 
 namespace GPGPU
 {
@@ -21,6 +23,11 @@ namespace GPGPU
 
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction, int warps = 13)
         {
+#if (benchmark)
+            var totalTiming = new Stopwatch();
+            totalTiming.Start();
+            var benchmarkTiming = new Stopwatch();
+#endif
             var gpu = Gpu.Default;
             var n = problemsToSolve.First().size;
             var power = 1 << n;
@@ -39,24 +46,16 @@ namespace GPGPU
             {
                 var matrixA = new int[problems.Length * n];
                 for (int problem = 0; problem < problems.Length; problem++)
-                {
                     for (int i = 0; i < n; i++)
-                    {
                         matrixA[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixA[i]);
-                    }
-                }
                 return matrixA;
             }).ToArray();
             var precomputedStateTransitioningMatrixB = problemsPartitioned.Select(problems =>
             {
                 var matrixB = new int[problems.Length * n];
                 for (int problem = 0; problem < problems.Length; problem++)
-                {
                     for (int i = 0; i < n; i++)
-                    {
                         matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
-                    }
-                }
                 return matrixB;
             }).ToArray();
 
@@ -72,7 +71,9 @@ namespace GPGPU
                 new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
                 sizeof(int) * 2 + 2 * sizeof(bool) + power * sizeof(bool) + power * sizeof(ushort) * 2
             );
-
+#if (benchmark)
+            benchmarkTiming.Start();
+#endif
             for (var stream = 0; stream < streamCount; stream++)
             {
                 streams[stream].Copy(precomputedStateTransitioningMatrixA[stream], gpuA[stream]);
@@ -93,6 +94,9 @@ namespace GPGPU
             foreach (var stream in streams)
                 stream.Synchronize();
 
+#if (benchmark)
+            benchmarkTiming.Stop();
+#endif
             var results = Enumerable.Range(0, streamCount).SelectMany(i =>
             {
                 return Gpu.CopyToHost(isSynchronizable[i])
@@ -118,6 +122,13 @@ namespace GPGPU
             if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
                 throw new Exception("Cerny conjecture is false");
 
+#if (benchmark)
+            results[0].benchmarkResult = new BenchmarkResult
+            {
+                benchmarkedTime = benchmarkTiming.Elapsed,
+                totalTime = totalTiming.Elapsed
+            };
+#endif
             return results;
         }
 

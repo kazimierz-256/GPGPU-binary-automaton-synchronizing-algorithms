@@ -1,4 +1,5 @@
-﻿using GPGPU.Interfaces;
+﻿#define benchmark
+using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
 using System.Collections.Concurrent;
@@ -7,7 +8,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace GPGPU
 {
     public class SlimCPU : IComputable
@@ -32,9 +32,11 @@ namespace GPGPU
 
         public ComputationResult ComputeOne(Problem problemToSolve)
         {
+#if (benchmark)
             var totalTiming = new Stopwatch();
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
+#endif
 
             var n = problemToSolve.size;
             var powerSetCount = 1 << n;
@@ -67,8 +69,10 @@ namespace GPGPU
             ushort currentNextDistance = 1;
             var verticesUntilBump = ushort.MaxValue;
             var seekingFirstNext = true;
+#if (benchmark)
 
             benchmarkTiming.Start();
+#endif
             while (queue.Count > 0)
             {
                 //if (queue.Count > maximumBreadth)
@@ -136,7 +140,10 @@ namespace GPGPU
                     }
                 }
             }
+#if (benchmark)
+
             benchmarkTiming.Stop();
+#endif
 
             // finished main loop
 
@@ -164,8 +171,10 @@ namespace GPGPU
             }
 
             result.shortestSynchronizingWordLength = firstSingletonDistance;
+#if (benchmark)
             result.benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
             result.benchmarkResult.totalTime = totalTiming.Elapsed;
+#endif
             return result;
         }
 

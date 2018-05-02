@@ -27,11 +27,11 @@ namespace GPGPU
                 //new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 17;
+            const long initialProblemSamplingCount = 1 << 18;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 
-            const int problemSeed = 123456;
+            const int problemSeed = 1234567;
             var watch = new Stopwatch();
 
             var version = theSolver.GetType().Namespace;
@@ -56,9 +56,10 @@ namespace GPGPU
                     watch.Stop();
 
                     var computationElapsed = watch.Elapsed;
-                    //var fractionOfTime = results.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
-                    //    / results.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
-
+                    var benchmarkedResults = results.Where(result => result.benchmarkResult != null && result.benchmarkResult.benchmarkedTime != null && result.benchmarkResult.totalTime != null);
+                    var fractionOfTime = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
+                        / benchmarkedResults.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
+                    Console.WriteLine(fractionOfTime);
                     watch.Reset();
                     watch.Start();
                     //if (!(
