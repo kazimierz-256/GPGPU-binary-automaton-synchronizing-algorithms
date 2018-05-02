@@ -29,7 +29,7 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void YoutubeExperimentalMathematicsSizeLarge()
         {
-            var n = 5;
+            var n = 13;
             var problem = ProblemGenerator.generateWorstCase(n);
 
             var result = GetLatestComputingUnit().ComputeOne(problem);

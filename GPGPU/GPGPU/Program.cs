@@ -29,7 +29,7 @@ namespace GPGPU
             var version = theSolver.GetType().Namespace;
             var csvBuilder = new StringBuilder("problemcount,cputime,gputime,cpugpucombinedtime");
             var resultsDictionary = new List<ComputationResult>();
-            var degreeOfParallelism = 8;
+            var degreeOfParallelism = theSolver.GetBestParallelism();
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;

@@ -272,6 +272,7 @@ namespace GPGPU
             result.benchmarkResult.totalTime = totalTiming.Elapsed;
             return result;
         }
+        public int GetBestParallelism() => Environment.ProcessorCount;
 
     }
 }

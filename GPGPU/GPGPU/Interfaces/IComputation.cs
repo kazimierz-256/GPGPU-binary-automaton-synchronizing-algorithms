@@ -11,5 +11,6 @@ namespace GPGPU.Interfaces
     {
         ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism);
         ComputationResult ComputeOne(Problem problemToSolve);
+        int GetBestParallelism();
     }
 }

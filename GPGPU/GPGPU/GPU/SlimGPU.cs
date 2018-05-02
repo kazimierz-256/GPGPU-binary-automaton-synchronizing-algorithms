@@ -18,7 +18,7 @@ namespace GPGPU
 
         public ComputationResult[] Compute(Problem[] problemsToSolve, int streamCount)
         {
-            var warps = 1; // dunno what to do with this guy
+            var warps = 32; // dunno what to do with this guy
             var gpu = Gpu.Default;
             var n = problemsToSolve[0].size;
             var power = 1 << n;
@@ -58,11 +58,11 @@ namespace GPGPU
             }).ToArray();
 
 
-            var gpuA = precomputedStateTransitioningMatrixA.Select(arg => gpu.Allocate(arg)).ToArray();
-            var gpuB = precomputedStateTransitioningMatrixB.Select(arg => gpu.Allocate(arg)).ToArray();
-            var shortestSynchronizingWordLength = Enumerable.Range(0, streamCount).Select(i => gpu.Allocate<int>(problemsToSolve.Length)).ToArray();
-            var isSynchronizable = Enumerable.Range(0, streamCount).Select(i => gpu.Allocate<bool>(problemsToSolve.Length)).ToArray();
-            var arrayCount = Enumerable.Range(0, streamCount).Select(i => gpu.Allocate(new[] { problemsToSolve.Length })).ToArray();
+            var gpuA = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
+            var gpuB = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
+            var shortestSynchronizingWordLength = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length)).ToArray();
+            var isSynchronizable = problemsPartitioned.Select(problems => gpu.Allocate<bool>(problems.Length)).ToArray();
+            var arrayCount = problemsPartitioned.Select(problems => gpu.Allocate(new[] { problems.Length })).ToArray();
 
             var launchParameters = new LaunchParam(
                 1,
@@ -85,7 +85,8 @@ namespace GPGPU
                     );
             }
 
-
+            foreach (var stream in streams)
+                stream.Synchronize();
 
             var results = Enumerable.Range(0, streamCount).SelectMany(i =>
             {
@@ -100,8 +101,6 @@ namespace GPGPU
                     ).ToArray();
             }).ToArray();
 
-            foreach (var stream in streams) stream.Dispose();
-
             foreach (var item in gpuA)
                 Gpu.Free(item);
             foreach (var item in gpuB)
@@ -112,6 +111,8 @@ namespace GPGPU
                 Gpu.Free(item);
             foreach (var item in arrayCount)
                 Gpu.Free(item);
+
+            foreach (var stream in streams) stream.Dispose();
 
             return results;
         }
@@ -225,5 +226,6 @@ namespace GPGPU
                 DeviceFunction.SyncThreads();
             }
         }
+        public int GetBestParallelism() => 4;
     }
 }

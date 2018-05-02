@@ -173,5 +173,6 @@ namespace GPGPU
             return result;
         }
 
+        public int GetBestParallelism() => Environment.ProcessorCount;
     }
 }
