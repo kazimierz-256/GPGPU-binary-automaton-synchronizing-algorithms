@@ -143,6 +143,7 @@ namespace GPGPU
             if (power < endingPointer)
                 endingPointer = power;
 
+            DeviceFunction.ThreadFenchBlock();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
                 while (correctlyProcessed < endingPointer - beginningPointer && !shouldStop[0])
@@ -203,12 +204,13 @@ namespace GPGPU
                         }
                     }
                     ++nextDistance;
-                    DeviceFunction.SyncThreads();
+                    //TODO: efficiency: should count up idle threads, if it is maximum, it means the graph is not synchronizable
+                    DeviceFunction.ThreadFenchBlock();
                     if (!addedSomethingThisRound[0])
                         break;
-                    DeviceFunction.SyncThreads();
+                    DeviceFunction.ThreadFenchBlock();
                     addedSomethingThisRound[0] = false;
-                    DeviceFunction.SyncThreads();
+                    DeviceFunction.ThreadFenchBlock();
                 }
 
                 if (ac < arrayCount[0] - 1)
@@ -224,7 +226,7 @@ namespace GPGPU
                         nextDistance = 1;
                         addedSomethingThisRound[0] = false;
                     }
-                    DeviceFunction.SyncThreads();
+                    DeviceFunction.ThreadFenchBlock();
                 }
             }
         }

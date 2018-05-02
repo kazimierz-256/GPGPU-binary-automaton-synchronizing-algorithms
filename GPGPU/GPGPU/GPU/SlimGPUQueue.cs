@@ -170,7 +170,7 @@ namespace GPGPU
             var readingQueueCount = queueOddCount;
             var writingQueueCount = queueEvenCount;
             int index, anotherIndex;
-            DeviceFunction.SyncThreads();
+            DeviceFunction.ThreadFenchBlock();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
                 index = ac * n;
@@ -226,7 +226,7 @@ namespace GPGPU
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
                         }
                     }
-                    DeviceFunction.SyncThreads();
+                    DeviceFunction.ThreadFenchBlock();
                     if (threadIdx.x == 0)
                     {
                         readingQueueCount[0] = 0;
@@ -236,7 +236,7 @@ namespace GPGPU
                     writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
                     readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
                     writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
-                    DeviceFunction.SyncThreads();
+                    DeviceFunction.ThreadFenchBlock();
                 }
 
                 if (ac < arrayCount[0] - 1)
@@ -259,7 +259,7 @@ namespace GPGPU
                         queueOdd[0] = (ushort)(power - 1);
                     }
                     nextDistance = 1;
-                    DeviceFunction.SyncThreads();
+                    DeviceFunction.ThreadFenchBlock();
                 }
             }
         }

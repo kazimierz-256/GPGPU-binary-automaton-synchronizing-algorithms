@@ -27,7 +27,7 @@ namespace GPGPU
                 //new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 17;
+            const long initialProblemSamplingCount = 1 << 18;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -44,6 +44,7 @@ namespace GPGPU
             {
                 foreach (var solver in theSolver)
                     computeLoopUsing(solver);
+
                 Console.WriteLine();
                 Console.WriteLine();
                 void computeLoopUsing(IComputable solver)
