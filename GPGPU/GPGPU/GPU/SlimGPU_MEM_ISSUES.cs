@@ -85,8 +85,7 @@ namespace GPGPU
 
             asyncAction?.Invoke();
 
-            foreach (var stream in streams)
-                stream.Synchronize();
+            gpu.Synchronize();
 
             var results = Enumerable.Range(0, streamCount).SelectMany(i =>
             {

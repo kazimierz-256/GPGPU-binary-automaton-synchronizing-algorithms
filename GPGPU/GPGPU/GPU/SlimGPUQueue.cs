@@ -94,8 +94,7 @@ namespace GPGPU
 
             asyncAction?.Invoke();
 
-            foreach (var stream in streams)
-                stream.Synchronize();
+            gpu.Synchronize();
 
 #if (benchmark)
             benchmarkTiming.Stop();
