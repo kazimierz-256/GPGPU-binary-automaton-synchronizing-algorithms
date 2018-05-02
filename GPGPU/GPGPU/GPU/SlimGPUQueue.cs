@@ -106,15 +106,11 @@ namespace GPGPU
                     ).ToArray();
             }).ToArray();
 
-            foreach (var item in gpuA)
-                Gpu.Free(item);
-            foreach (var item in gpuB)
-                Gpu.Free(item);
-            foreach (var item in shortestSynchronizingWordLength)
-                Gpu.Free(item);
-            foreach (var item in isSynchronizable)
-                Gpu.Free(item);
-            foreach (var item in arrayCount)
+            foreach (var item in gpuA.AsEnumerable<Array>()
+                .Concat(gpuB)
+                .Concat(shortestSynchronizingWordLength)
+                .Concat(isSynchronizable)
+                .Concat(arrayCount))
                 Gpu.Free(item);
 
             foreach (var stream in streams) stream.Dispose();

@@ -21,14 +21,14 @@ namespace GPGPU
             const int problemSize = 13;
             var theSolver = new[]
             {
-                new CPU() as IComputable,
-                new SlimCPU() as IComputable,
+                //new CPU() as IComputable,
+                //new SlimCPU() as IComputable,
                 //new SlimGPU() as IComputable,
-                new SlimCPUGPU() as IComputable,
+                //new SlimCPUGPU() as IComputable,
                 new SlimGPUQueue() as IComputable,
             };
-            const long initialProblemSamplingCount = 1 << 5;
-            double sizeIncrease = 2;// Math.Pow(2, 1d / 2);
+            const long initialProblemSamplingCount = 1 << 17;
+            double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 
             const int problemSeed = 123456;
@@ -44,7 +44,8 @@ namespace GPGPU
             {
                 foreach (var solver in theSolver)
                     computeLoopUsing(solver);
-
+                Console.WriteLine();
+                Console.WriteLine();
                 void computeLoopUsing(IComputable solver)
                 {
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed * n);
