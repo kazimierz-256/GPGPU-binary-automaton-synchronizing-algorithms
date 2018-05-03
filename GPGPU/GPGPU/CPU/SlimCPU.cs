@@ -1,4 +1,4 @@
-﻿//#define benchmark
+﻿#define benchmark
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
