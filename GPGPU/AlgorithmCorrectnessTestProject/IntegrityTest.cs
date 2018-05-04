@@ -37,7 +37,9 @@ namespace AlgorithmCorrectnessTestProject
             {
                 foreach (var size in sizes)
                 {
-                    var problems = Problem.GetArrayOfProblems(n, size, seed).Skip(11).Take(5);
+                    // 10, 6
+                    // 11, 5 don't work correctly...
+                    var problems = Problem.GetArrayOfProblems(n, size, seed).Skip(10).Take(6);
 
                     var results = computables
                         .Select(computable => computable.Compute(problems, computable.GetBestParallelism()))
