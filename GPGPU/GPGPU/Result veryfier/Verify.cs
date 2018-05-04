@@ -14,6 +14,8 @@ namespace GPGPU.Result_veryfier
             ComputationResult computationResult,
             int degreeOfParallelism)
         {
+            if (!computationResult.isSynchronizable)
+                return true;
             var initialQuery = Enumerable.Range(0, problem.size);
             // for degree of parallelism == 1 the algorithm should be smarter (faster)
             if (degreeOfParallelism > 1)
@@ -34,7 +36,7 @@ namespace GPGPU.Result_veryfier
             //var firstElement = partialResult.First();
             //return partialResult.All(result => result == firstElement);
 
-            return initialQuery.Select(letter =>
+            var distinct = initialQuery.Select(letter =>
             {
                 int resultingLetter = letter;
                 foreach (var isB in computationResult.shortestSynchronizingWord)
@@ -43,7 +45,12 @@ namespace GPGPU.Result_veryfier
                     : problem.stateTransitioningMatrixA[resultingLetter];
                 }
                 return resultingLetter;
-            }).Distinct().Count() == 1;
+            }).Distinct().Count();
+            if (distinct != 1)
+            {
+
+            }
+            return distinct == 1;
         }
 
         //public static bool VerifySynchronizability() { }

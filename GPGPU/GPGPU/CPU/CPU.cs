@@ -113,7 +113,8 @@ namespace GPGPU
             bool[] isDiscovered = new bool[powerSetCount];
             isDiscovered[initialVertex] = true;
 
-            if (reuseResources)
+            // HACK: forbid reusing of resources
+            if (reuseResources && false)
             {
                 // use whatever size is needed, they all should be consistent (of same size)
                 if (previousVertexReusable.Length != powerSetCount)
@@ -147,23 +148,26 @@ namespace GPGPU
             var precomputedStateTransitioningMatrixA = new ushort[n + 1];
             var precomputedStateTransitioningMatrixB = new ushort[n + 1];
 
+            //Trace.WriteLine($"New Alg -----------------------");
             for (int i = 0; i < n; i++)
             {
                 precomputedStateTransitioningMatrixA[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
                 precomputedStateTransitioningMatrixB[i + 1] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
+                //Trace.WriteLine($"precomputedA[{i+1}] = {precomputedStateTransitioningMatrixA[i + 1]}");
+                //Trace.WriteLine($"precomputedB[{i+1}] = {precomputedStateTransitioningMatrixB[i + 1]}");
             }
 
             var maximumBreadth = 0;
             ushort bumpUpVertex = 0;
             ushort currentNextDistance = 1;
             bool seekingFirstNext = true;
-
             while (queue.Count > 0)
             {
                 if (queue.Count > maximumBreadth)
                     maximumBreadth = queue.Count;
 
                 extractingBits = consideringVertex = queue.Dequeue();
+                //Trace.WriteLine($"current {consideringVertex}");
                 if (consideringVertex == bumpUpVertex)
                 {
                     ++currentNextDistance;
@@ -180,12 +184,14 @@ namespace GPGPU
                 for (int i = 1; i <= n; i++)
                 {
                     targetIndexPlusOne = (extractingBits & 1) * i;
-
+                    //Trace.WriteLine($"matrixA  {precomputedStateTransitioningMatrixA[targetIndexPlusOne]} indexplusone {targetIndexPlusOne}");
+                    //Trace.WriteLine($"matrixB {precomputedStateTransitioningMatrixB[targetIndexPlusOne]} indexplusone {targetIndexPlusOne}");
                     vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[targetIndexPlusOne];
                     vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[targetIndexPlusOne];
                     extractingBits >>= 1;
                 }
-
+                //Trace.WriteLine($"a {vertexAfterTransitionA}");
+                //Trace.WriteLine($"b {vertexAfterTransitionB}");
                 if (!isDiscovered[vertexAfterTransitionA])
                 {
                     if (seekingFirstNext)
@@ -273,7 +279,7 @@ namespace GPGPU
             result.benchmarkResult.totalTime = totalTiming.Elapsed;
             return result;
         }
-        public int GetBestParallelism() => Environment.ProcessorCount;
+        public int GetBestParallelism() => 1;
 
     }
 }

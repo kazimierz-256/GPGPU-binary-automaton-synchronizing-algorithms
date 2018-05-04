@@ -23,7 +23,7 @@ namespace GPGPU
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1000_0000_0000_0000)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 1)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -49,18 +49,16 @@ namespace GPGPU
             var streams = Enumerable.Range(0, streamCount)
                 .Select(_ => gpu.CreateStream()).ToArray();
 
-            var stateTransitionGPU = problemsPartitioned
-                .Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
-            var shortestSynchronizingWordLength = problemsPartitioned
-                .Select(problems => gpu.Allocate<int>(problems.Length)).ToArray();
-            var isSynchronizable = problemsPartitioned
-                .Select(problems => gpu.Allocate<bool>(problems.Length)).ToArray();
+            var gpuA = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
+            var gpuB = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
+            var shortestSynchronizingWordLength = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length)).ToArray();
+            var isSynchronizable = problemsPartitioned.Select(problems => gpu.Allocate<bool>(problems.Length)).ToArray();
             gpu.Copy(n, problemSize);
 
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
                 new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
-                sizeof(int) * 2 + 2 * sizeof(bool) + power * sizeof(bool) + power * sizeof(ushort) * 2
+                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(byte) + power * sizeof(ushort) * 2
             );
 #if (benchmark)
             benchmarkTiming.Start();
@@ -71,19 +69,23 @@ namespace GPGPU
             var gpuResultsShortestSynchronizingWordLength = problemsPartitioned
                 .Select(problems => new int[problems.Length])
                 .ToArray();
-            var globalMatrixTransition = new int[partitionCount][];
-            Enumerable.Range(0, problemsPartitioned.Length).AsParallel().ForAll(p =>
-            {
-                globalMatrixTransition[p] = new int[problemsPartitioned[p].Length * n * 2];
-                for (int problem = 0; problem < problemsPartitioned[p].Length; problem++)
-                    for (int i = 0; i < n; i++)
-                    {
-                        globalMatrixTransition[p][problem * 2 * n + i] = (ushort)(1 << problemsPartitioned[p][problem].stateTransitioningMatrixA[i]);
-                        globalMatrixTransition[p][problem * 2 * n + n + i] = (ushort)(1 << problemsPartitioned[p][problem].stateTransitioningMatrixB[i]);
-                    }
-            });
+
+            var streamToRecover = new Queue<KeyValuePair<int, int>>(streamCount);
+
             for (int partition = 0; partition < partitionCount; partition++)
             {
+                var problems = problemsPartitioned[partition];
+
+                var matrixA = new int[problems.Length * n];
+                for (int problem = 0; problem < problems.Length; problem++)
+                    for (int i = 0; i < n; i++)
+                        matrixA[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixA[i]);
+
+                var matrixB = new int[problems.Length * n];
+                for (int problem = 0; problem < problems.Length; problem++)
+                    for (int i = 0; i < n; i++)
+                        matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
+
                 var stream = partition % streamCount;
                 var reusingStream = partition >= streamCount;
                 if (reusingStream)
@@ -91,20 +93,32 @@ namespace GPGPU
                     streams[stream].Synchronize();
                     streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partition - streamCount]);
                     streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partition - streamCount]);
+                    Gpu.FreeAllImplicitMemory();
+                    streamToRecover.Dequeue();
                 }
-                streams[stream].Copy(globalMatrixTransition[partition], stateTransitionGPU[stream]);
+                streams[stream].Copy(matrixA, gpuA[stream]);
+                streams[stream].Copy(matrixB, gpuB[stream]);
 
                 streams[stream].Launch(
                     Kernel,
                     launchParameters,
-                    stateTransitionGPU[stream],
+                    gpuA[stream],
+                    gpuB[stream],
                     isSynchronizable[stream],
                     shortestSynchronizingWordLength[stream]
                     );
+                streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partition));
             }
-            asyncAction?.Invoke();
 
-            gpu.Synchronize();
+            foreach (var streamPartitionKVP in streamToRecover)
+            {
+                streams[streamPartitionKVP.Key].Synchronize();
+                streams[streamPartitionKVP.Key].Copy(isSynchronizable[streamPartitionKVP.Key], gpuResultsIsSynchronizable[streamPartitionKVP.Value]);
+                streams[streamPartitionKVP.Key].Copy(shortestSynchronizingWordLength[streamPartitionKVP.Key], gpuResultsShortestSynchronizingWordLength[streamPartitionKVP.Value]);
+            }
+            Gpu.FreeAllImplicitMemory();
+
+            //gpu.Synchronize();
 
 #if (benchmark)
             benchmarkTiming.Stop();
@@ -119,7 +133,8 @@ namespace GPGPU
                 ).ToArray()
             ).ToArray();
 
-            foreach (var array in stateTransitionGPU.AsEnumerable<Array>()
+            foreach (var array in gpuA.AsEnumerable<Array>()
+                .Concat(gpuB)
                 .Concat(shortestSynchronizingWordLength)
                 .Concat(isSynchronizable))
                 Gpu.Free(array);
@@ -129,7 +144,8 @@ namespace GPGPU
 
             if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
                 throw new Exception("Cerny conjecture is false");
-
+            //Console.WriteLine(results[0].isSynchronizable);
+            //Console.WriteLine(results[1].isSynchronizable);
 #if (benchmark)
             results[0].benchmarkResult = new BenchmarkResult
             {
@@ -141,69 +157,89 @@ namespace GPGPU
         }
 
         public static void Kernel(
-            int[] precomputedStateTransitioningMatrix,
+            int[] precomputedStateTransitioningMatrixA,
+            int[] precomputedStateTransitioningMatrixB,
             bool[] isSynchronizing,
             int[] shortestSynchronizingWordLength)
         {
             var n = problemSize.Value;
-            var arrayCount = precomputedStateTransitioningMatrix.Length / 2 / n;
+            var arrayCount = precomputedStateTransitioningMatrixA.Length / n;
             var power = 1 << n;
 
             var queueEvenCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(0);
             var queueOddCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                .Ptr(1);
+                .Ptr(sizeof(int) / sizeof(int));
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr(2 * 4).Volatile();
+                .Ptr((2 * sizeof(int)) / sizeof(bool)).Volatile();
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr(2 * 4 + 2).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool)) / sizeof(bool)).Volatile();
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(2 * 2 + 1 + power / 2).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool)) / sizeof(ushort)).Volatile();
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(2 * 2 + 1 + power / 2 + power).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + power * sizeof(ushort)) / sizeof(ushort)).Volatile();
 
             if (threadIdx.x == 0)
-            {
-                queueOdd[0] = (ushort)(power - 1);
                 isDiscoveredPtr[power - 1] = true;
-                queueOddCount[0] = 1;
-            }
-            ushort nextDistance = 1;
-            int vertexAfterTransitionA, vertexAfterTransitionB;
 
-            var readingQueue = queueOdd;
-            var writingQueue = queueEven;
-            var readingQueueCount = queueOddCount;
-            var writingQueueCount = queueEvenCount;
-            int index, anotherIndex;
+            ushort nextDistance;
+            int vertexAfterTransitionA,
+                vertexAfterTransitionB,
+                index = 0;
+
             DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount; ac++)
             {
-                index = ac * n;
-                while (readingQueueCount[0] > 0 && !shouldStop[0])
+                // cleanup
                 {
-                    int myPart = (readingQueueCount[0] + blockDim.x - 1) / blockDim.x;
+                    int myPart = (power + blockDim.x - 1) / blockDim.x;
                     int beginningPointer = threadIdx.x * myPart;
                     int endingPointer = (threadIdx.x + 1) * myPart;
-                    if (readingQueueCount[0] < endingPointer)
-                        endingPointer = readingQueueCount[0];
+                    if (power - 1 < endingPointer)
+                        endingPointer = power - 1;
+                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
+                    {
+                        isDiscoveredPtr[consideringVertex] = false;
+                    }
+                }
+                if (threadIdx.x == 0)
+                {
+                    shouldStop[0] = false;
+                    queueEvenCount[0] = 0;
+                    queueOddCount[0] = 1;
+                    queueOdd[0] = (ushort)(power - 1);
 
+                }
+                var readingQueue = queueOdd;
+                var writingQueue = queueEven;
+                var readingQueueCount = queueOddCount;
+                var writingQueueCount = queueEvenCount;
+
+                nextDistance = 1;
+                int readingQueueCountCached = 1;
+                DeviceFunction.SyncThreads();
+
+                while (readingQueueCountCached > 0 && !shouldStop[0])
+                {
+                    int myPart = (readingQueueCountCached + blockDim.x - 1) / blockDim.x;
+                    int beginningPointer = threadIdx.x * myPart;
+                    int endingPointer = (threadIdx.x + 1) * myPart;
+                    if (readingQueueCountCached < endingPointer)
+                        endingPointer = readingQueueCountCached;
                     for (int iter = beginningPointer; iter < endingPointer; ++iter)
                     {
                         int consideringVertex = readingQueue[iter];
                         vertexAfterTransitionA = vertexAfterTransitionB = 0;
-                        anotherIndex = index;
-                        for (int i = 0; i < n; i++, anotherIndex++)
+                        for (int i = 0; i < n; i++)
                         {
                             if (0 != ((1 << i) & consideringVertex))
                             {
                                 vertexAfterTransitionA |=
-                                    precomputedStateTransitioningMatrix[anotherIndex];
+                                    precomputedStateTransitioningMatrixA[index + i];
                                 vertexAfterTransitionB |=
-                                   precomputedStateTransitioningMatrix[anotherIndex + n];
+                                    precomputedStateTransitioningMatrixB[index + i];
                             }
                         }
-
                         if (!isDiscoveredPtr[vertexAfterTransitionA])
                         {
                             if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
@@ -235,40 +271,17 @@ namespace GPGPU
                         }
                     }
                     DeviceFunction.SyncThreads();
-                    if (threadIdx.x == 0)
-                    {
-                        readingQueueCount[0] = 0;
-                    }
                     ++nextDistance;
                     readingQueue = nextDistance % 2 == 0 ? queueEven : queueOdd;
                     writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
                     readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
                     writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
-                    DeviceFunction.SyncThreads();
-                }
-
-                if (ac < arrayCount - 1)
-                {
-                    // cleanup
-                    int myPart = (power + blockDim.x - 1) / blockDim.x;
-                    int beginningPointer = threadIdx.x * myPart;
-                    int endingPointer = (threadIdx.x + 1) * myPart;
-                    if (power - 1 < endingPointer)
-                        endingPointer = power;
-                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
-                    {
-                        isDiscoveredPtr[consideringVertex] = false;
-                    }
+                    readingQueueCountCached = nextDistance % 2 == 0 ? queueEvenCount[0] : queueOddCount[0];
                     if (threadIdx.x == 0)
-                    {
-                        shouldStop[0] = false;
-                        queueEvenCount[0] = 0;
-                        queueOddCount[0] = 1;
-                        queueOdd[0] = (ushort)(power - 1);
-                    }
-                    nextDistance = 1;
+                        writingQueueCount[0] = 0;
                     DeviceFunction.SyncThreads();
                 }
+                index += n;
             }
         }
         public int GetBestParallelism() => 4;

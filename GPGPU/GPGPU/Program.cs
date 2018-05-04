@@ -23,13 +23,13 @@ namespace GPGPU
                 new SlimCPU(),
                 //new SlimGPU(),// memory issues...
                 //new SlimCPUGPU(),
-                new SlimGPUQueue(),
+                //new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 18;
+            const long initialProblemSamplingCount = 1 << 19;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 
-            const int problemSeed = 1234567;
+            const int problemSeed = 123456;
             var random = new Random(problemSeed);
             var watch = new Stopwatch();
 
