@@ -20,7 +20,7 @@ namespace GPGPU.Result_veryfier
             // for degree of parallelism == 1 the algorithm should be smarter (faster)
             if (degreeOfParallelism > 1)
             {
-                initialQuery = initialQuery.AsParallel().WithDegreeOfParallelism(degreeOfParallelism);
+                initialQuery = initialQuery.AsParallel().AsOrdered().WithDegreeOfParallelism(degreeOfParallelism);
             }
 
             //var partialResult = initialQuery.Select(letter =>

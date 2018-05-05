@@ -24,6 +24,7 @@ namespace GPGPU
             {
                 return problemsToSolve
                     .AsParallel()
+                    .AsOrdered()
                     .WithDegreeOfParallelism(degreeOfParallelism)
                     .Select(problem => ComputeOne(problem))
                     .ToArray();
@@ -178,6 +179,6 @@ namespace GPGPU
             return result;
         }
 
-        public int GetBestParallelism() => Environment.ProcessorCount;
+        public int GetBestParallelism() => Environment.ProcessorCount/4;
     }
 }

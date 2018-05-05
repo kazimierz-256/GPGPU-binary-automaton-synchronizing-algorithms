@@ -65,6 +65,7 @@ namespace GPGPU
                     reusablesQueue.Enqueue(i);
                 return problemsToSolve
                     .AsParallel()
+                    .AsOrdered()
                     .WithDegreeOfParallelism(degreeOfParallelism)
                     .Select(problem =>
                     {
@@ -279,7 +280,7 @@ namespace GPGPU
             result.benchmarkResult.totalTime = totalTiming.Elapsed;
             return result;
         }
-        public int GetBestParallelism() => 1;
+        public int GetBestParallelism() => 8;
 
     }
 }

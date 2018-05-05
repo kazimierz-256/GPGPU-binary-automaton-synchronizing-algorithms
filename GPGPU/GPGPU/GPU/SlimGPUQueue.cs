@@ -23,7 +23,7 @@ namespace GPGPU
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 1)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1_0000_0000_0000_000)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -191,6 +191,7 @@ namespace GPGPU
             for (int ac = 0; ac < arrayCount; ac++)
             {
                 // cleanup
+                if (ac > 0)
                 {
                     int myPart = (power + blockDim.x - 1) / blockDim.x;
                     int beginningPointer = threadIdx.x * myPart;
@@ -270,12 +271,12 @@ namespace GPGPU
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
                         }
                     }
-                    DeviceFunction.SyncThreads();
                     ++nextDistance;
                     readingQueue = nextDistance % 2 == 0 ? queueEven : queueOdd;
                     writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
                     readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
                     writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
+                    DeviceFunction.SyncThreads();
                     readingQueueCountCached = nextDistance % 2 == 0 ? queueEvenCount[0] : queueOddCount[0];
                     if (threadIdx.x == 0)
                         writingQueueCount[0] = 0;

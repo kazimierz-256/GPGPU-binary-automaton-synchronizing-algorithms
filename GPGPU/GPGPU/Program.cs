@@ -23,9 +23,9 @@ namespace GPGPU
                 new SlimCPU(),
                 //new SlimGPU(),// memory issues...
                 //new SlimCPUGPU(),
-                //new SlimGPUQueue(),
+                new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 19;
+            const long initialProblemSamplingCount = 1 << 17;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -49,8 +49,9 @@ namespace GPGPU
                 Console.WriteLine();
                 void computeLoopUsing(IComputable solver)
                 {
-                    var problems = Problem.GetArrayOfProblems(n, problemSize, localSeed);
+                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
+                    //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
 
                     watch.Start();
                     var results = solver.Compute(problems, solver.GetBestParallelism());

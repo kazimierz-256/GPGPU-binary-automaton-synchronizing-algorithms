@@ -18,16 +18,16 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void CheckIntegrity()
         {
-            var n = 16;
+            var n = 1<<15;
             // there are issues with multiple sized problems!
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
-            var sizes = Enumerable.Range(3, 1).ToArray();
+            var sizes = Enumerable.Range(13, 1).ToArray();
             var seeds = Enumerable.Range(123456, 1).ToArray();
 
             var computables = new IComputable[] {
                 new CPU(),
-                //new SlimCPU(),
+                new SlimCPU(),
                 //new SlimGPU(),// we're having issues with memory allocation...
                 new SlimGPUQueue(),
                 //new SlimCPUGPU(),
@@ -39,7 +39,7 @@ namespace AlgorithmCorrectnessTestProject
                 {
                     // 10, 6
                     // 11, 5 don't work correctly...
-                    var problems = Problem.GetArrayOfProblems(n, size, seed).Skip(10).Take(6);
+                    var problems = Problem.GetArrayOfProblems(n, size, seed);//.Skip(10).Take(6);
 
                     var results = computables
                         .Select(computable => computable.Compute(problems, computable.GetBestParallelism()))
@@ -62,9 +62,11 @@ namespace AlgorithmCorrectnessTestProject
                     {
                         Assert.AreEqual(results.First().Length, result.Length, "Incomplete results");
                     }
+                    int resultId = 0;
                     Assert.IsTrue(
                     results.Skip(1).SelectMany(result => results[0].Zip(result, (result0, resultR) =>
                         {
+                            resultId++;
                             if (result0.isSynchronizable != resultR.isSynchronizable)
                                 return false;
                             if (result0.isSynchronizable)
