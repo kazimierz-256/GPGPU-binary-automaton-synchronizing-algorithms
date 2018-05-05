@@ -79,9 +79,9 @@ namespace GPGPU
 
             var streamToRecover = new Queue<KeyValuePair<int, int>>(streamCount);
 
-            for (int partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++)
+            for (int partition = 0; partition < partitionCount; partition++)
             {
-                var problems = problemsPartitioned[partitionIndex];
+                var problems = problemsPartitioned[partition];
 
                 var matrixA = new int[problems.Length * n];
                 for (int problem = 0; problem < problems.Length; problem++)
@@ -93,19 +93,19 @@ namespace GPGPU
                     for (int i = 0; i < n; i++)
                         matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
 
-                var stream = partitionIndex % streamCount;
-                var reusingStream = partitionIndex >= streamCount;
+                var stream = partition % streamCount;
+                var reusingStream = partition >= streamCount;
                 if (reusingStream)
                 {
 #if (benchmark)
                     benchmarkTiming.Start();
 #endif
                     streams[stream].Synchronize();
-                    streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partitionIndex - streamCount]);
+                    streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partition - streamCount]);
 #if (benchmark)
                     benchmarkTiming.Stop();
 #endif
-                    streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partitionIndex - streamCount]);
+                    streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partition - streamCount]);
                     //Gpu.FreeAllImplicitMemory();
                     streamToRecover.Dequeue();
                 }
@@ -120,7 +120,7 @@ namespace GPGPU
                     isSynchronizable[stream],
                     shortestSynchronizingWordLength[stream]
                     );
-                streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partitionIndex));
+                streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partition));
             }
             asyncAction?.Invoke();
             foreach (var streamPartitionKVP in streamToRecover)
