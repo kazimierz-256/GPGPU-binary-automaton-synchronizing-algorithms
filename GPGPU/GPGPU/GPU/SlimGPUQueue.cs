@@ -23,7 +23,7 @@ namespace GPGPU
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1_0000_0000_0000_000)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1_0000_0000_0000_00)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -60,9 +60,6 @@ namespace GPGPU
                 new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
                 sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(byte) + power * sizeof(ushort) * 2
             );
-#if (benchmark)
-            benchmarkTiming.Start();
-#endif
             var gpuResultsIsSynchronizable = problemsPartitioned
                 .Select(problems => new bool[problems.Length])
                 .ToArray();
@@ -90,10 +87,16 @@ namespace GPGPU
                 var reusingStream = partition >= streamCount;
                 if (reusingStream)
                 {
-                    streams[stream].Synchronize();
+#if (benchmark)
+                    benchmarkTiming.Start();
+#endif
+                    //streams[stream].Synchronize();
                     streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partition - streamCount]);
+#if (benchmark)
+                    benchmarkTiming.Stop();
+#endif
                     streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partition - streamCount]);
-                    Gpu.FreeAllImplicitMemory();
+                    //Gpu.FreeAllImplicitMemory();
                     streamToRecover.Dequeue();
                 }
                 streams[stream].Copy(matrixA, gpuA[stream]);
@@ -112,16 +115,21 @@ namespace GPGPU
             asyncAction?.Invoke();
             foreach (var streamPartitionKVP in streamToRecover)
             {
-                streams[streamPartitionKVP.Key].Synchronize();
+#if (benchmark)
+                benchmarkTiming.Start();
+#endif
+                //streams[streamPartitionKVP.Key].Synchronize();
                 streams[streamPartitionKVP.Key].Copy(isSynchronizable[streamPartitionKVP.Key], gpuResultsIsSynchronizable[streamPartitionKVP.Value]);
+#if (benchmark)
+                benchmarkTiming.Stop();
+#endif
                 streams[streamPartitionKVP.Key].Copy(shortestSynchronizingWordLength[streamPartitionKVP.Key], gpuResultsShortestSynchronizingWordLength[streamPartitionKVP.Value]);
             }
-            Gpu.FreeAllImplicitMemory();
+            //Gpu.FreeAllImplicitMemory();
 
             //gpu.Synchronize();
 
 #if (benchmark)
-            benchmarkTiming.Stop();
 #endif
             var results = Enumerable.Range(0, partitionCount).SelectMany(i => gpuResultsIsSynchronizable[i].Zip(gpuResultsShortestSynchronizingWordLength[i], (isSyncable, shortestWordLength)
                             => new ComputationResult()

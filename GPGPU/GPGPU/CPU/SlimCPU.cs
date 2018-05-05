@@ -49,7 +49,7 @@ namespace GPGPU
             isDiscovered[initialVertex] = true;
 
             // EXPENSIVE LINE
-            var queue = new Queue<ushort>();
+            var queue = new Queue<ushort>(n * 5);
             queue.Enqueue(initialVertex);
             benchmarkTiming.Start();
 
@@ -180,6 +180,6 @@ namespace GPGPU
             return result;
         }
 
-        public int GetBestParallelism() => Environment.ProcessorCount/4;
+        public int GetBestParallelism() => Environment.ProcessorCount / 4;
     }
 }
