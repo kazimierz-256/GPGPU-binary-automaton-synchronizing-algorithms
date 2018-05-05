@@ -44,12 +44,14 @@ namespace GPGPU
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
+            // EXPENSIVE LINE
             var isDiscovered = new bool[powerSetCount];
             isDiscovered[initialVertex] = true;
 
-
-            var queue = new Queue<ushort>(n * 5);
+            // EXPENSIVE LINE
+            var queue = new Queue<ushort>();
             queue.Enqueue(initialVertex);
+            benchmarkTiming.Start();
 
             var discoveredSingleton = false;
             ushort consideringVertex;
@@ -72,7 +74,6 @@ namespace GPGPU
             var seekingFirstNext = true;
 #if (benchmark)
 
-            benchmarkTiming.Start();
 #endif
             while (queue.Count > 0)
             {

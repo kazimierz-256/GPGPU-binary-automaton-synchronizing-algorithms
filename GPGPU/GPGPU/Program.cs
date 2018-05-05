@@ -1,4 +1,7 @@
-﻿using GPGPU.Interfaces;
+﻿using Alea;
+using Alea.CSharp;
+using Alea.FSharp;
+using GPGPU.Interfaces;
 using GPGPU.Result_veryfier;
 using GPGPU.Shared;
 using LinqStatistics;
@@ -21,11 +24,11 @@ namespace GPGPU
             {
                 new CPU(),
                 new SlimCPU(),
-                new SlimGPU(),
+                //new SlimGPUBuggy(),
                 //new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 17;
+            const long initialProblemSamplingCount = 1 << 16;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
 
@@ -39,6 +42,8 @@ namespace GPGPU
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
+            Console.WriteLine("Heating up the GPU... please stand by");
+            Gpu.Default.Launch(() => { }, new LaunchParam(1, 1));
             for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
                 var localSeed = random.Next();

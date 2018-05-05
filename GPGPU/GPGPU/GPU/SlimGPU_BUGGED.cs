@@ -11,7 +11,7 @@ using Alea.FSharp;
 
 namespace GPGPU
 {
-    public class SlimGPU : IComputable
+    public class SlimGPUBuggy : IComputable
     {
         public ComputationResult ComputeOne(Problem problemToSolve)
         => Compute(new[] { problemToSolve }, 1)[0];
