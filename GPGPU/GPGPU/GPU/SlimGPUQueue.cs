@@ -109,7 +109,7 @@ namespace GPGPU
                     );
                 streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partition));
             }
-
+            asyncAction?.Invoke();
             foreach (var streamPartitionKVP in streamToRecover)
             {
                 streams[streamPartitionKVP.Key].Synchronize();
