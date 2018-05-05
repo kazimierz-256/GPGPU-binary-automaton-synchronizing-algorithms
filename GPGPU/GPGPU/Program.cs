@@ -21,7 +21,7 @@ namespace GPGPU
             {
                 //new CPU(),
                 new SlimCPU(),
-                //new SlimGPU(),// memory issues...
+                new SlimGPU(),
                 //new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };

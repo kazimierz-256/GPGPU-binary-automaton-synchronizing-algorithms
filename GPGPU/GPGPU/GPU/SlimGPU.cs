@@ -94,6 +94,7 @@ namespace GPGPU
                     => new ComputationResult()
                     {
                         size = problemsToSolve.First().size,
+                        computationType = ComputationType.GPU,
                         isSynchronizable = isSyncable,
                         shortestSynchronizingWordLength = shortestWordLength
                     }
@@ -230,6 +231,6 @@ namespace GPGPU
                 }
             }
         }
-        public int GetBestParallelism() => 3;
+        public int GetBestParallelism() => 4;
     }
 }

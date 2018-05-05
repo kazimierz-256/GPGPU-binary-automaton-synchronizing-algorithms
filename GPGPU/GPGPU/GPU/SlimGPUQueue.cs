@@ -126,6 +126,7 @@ namespace GPGPU
             var results = Enumerable.Range(0, partitionCount).SelectMany(i => gpuResultsIsSynchronizable[i].Zip(gpuResultsShortestSynchronizingWordLength[i], (isSyncable, shortestWordLength)
                             => new ComputationResult()
                             {
+                                computationType = ComputationType.GPU,
                                 size = problemsToSolve.First().size,
                                 isSynchronizable = isSyncable,
                                 shortestSynchronizingWordLength = shortestWordLength
