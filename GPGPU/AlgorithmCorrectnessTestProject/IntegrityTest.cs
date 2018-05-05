@@ -23,10 +23,10 @@ namespace AlgorithmCorrectnessTestProject
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
             var sizes = Enumerable.Range(13, 1).ToArray();
-            var seeds = Enumerable.Range(123456, 1).ToArray();
+            var seeds = Enumerable.Range(123456, 4).ToArray();
 
             var computables = new IComputable[] {
-                new CPU(),
+                //new CPU(),
                 new SlimCPU(),
                 //new SlimGPU(),// we're having issues with memory allocation...
                 new SlimGPUQueue(),

@@ -42,8 +42,6 @@ namespace GPGPU
 
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
-            Console.WriteLine("Heating up the GPU... please stand by");
-            Gpu.Default.Launch(() => { }, new LaunchParam(1, 1));
             for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             {
                 var localSeed = random.Next();

@@ -20,10 +20,17 @@ namespace GPGPU
         public ComputationResult ComputeOne(Problem problemToSolve)
         => Compute(new[] { problemToSolve }, 1)[0];
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
+        public ComputationResult[] Compute(
+            IEnumerable<Problem> problemsToSolve,
+            int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1_0000_0000_0000_00)
+        public ComputationResult[] Compute(
+            IEnumerable<Problem> problemsToSolve,
+            int streamCount,
+            Action asyncAction = null,
+            int warps = 13,
+            int usedStreams = 4)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -37,7 +44,10 @@ namespace GPGPU
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
+            if (usedStreams > streamCount)
+                throw new Exception("Too many streams requested, bad things will happen");
 
+            var problemsPerStream = problemsToSolve.Count() / usedStreams;
             var partitionCount = (problemsToSolve.Count() + problemsPerStream - 1) / problemsPerStream;
             var problemsPartitioned = Enumerable.Range(0, partitionCount)
                 .Select(i => problemsToSolve.Skip(problemsPerStream * i)
@@ -69,9 +79,9 @@ namespace GPGPU
 
             var streamToRecover = new Queue<KeyValuePair<int, int>>(streamCount);
 
-            for (int partition = 0; partition < partitionCount; partition++)
+            for (int partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++)
             {
-                var problems = problemsPartitioned[partition];
+                var problems = problemsPartitioned[partitionIndex];
 
                 var matrixA = new int[problems.Length * n];
                 for (int problem = 0; problem < problems.Length; problem++)
@@ -83,19 +93,19 @@ namespace GPGPU
                     for (int i = 0; i < n; i++)
                         matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
 
-                var stream = partition % streamCount;
-                var reusingStream = partition >= streamCount;
+                var stream = partitionIndex % streamCount;
+                var reusingStream = partitionIndex >= streamCount;
                 if (reusingStream)
                 {
 #if (benchmark)
                     benchmarkTiming.Start();
 #endif
-                    //streams[stream].Synchronize();
-                    streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partition - streamCount]);
+                    streams[stream].Synchronize();
+                    streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partitionIndex - streamCount]);
 #if (benchmark)
                     benchmarkTiming.Stop();
 #endif
-                    streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partition - streamCount]);
+                    streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partitionIndex - streamCount]);
                     //Gpu.FreeAllImplicitMemory();
                     streamToRecover.Dequeue();
                 }
@@ -110,7 +120,7 @@ namespace GPGPU
                     isSynchronizable[stream],
                     shortestSynchronizingWordLength[stream]
                     );
-                streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partition));
+                streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partitionIndex));
             }
             asyncAction?.Invoke();
             foreach (var streamPartitionKVP in streamToRecover)
@@ -118,7 +128,7 @@ namespace GPGPU
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
-                //streams[streamPartitionKVP.Key].Synchronize();
+                streams[streamPartitionKVP.Key].Synchronize();
                 streams[streamPartitionKVP.Key].Copy(isSynchronizable[streamPartitionKVP.Key], gpuResultsIsSynchronizable[streamPartitionKVP.Value]);
 #if (benchmark)
                 benchmarkTiming.Stop();
