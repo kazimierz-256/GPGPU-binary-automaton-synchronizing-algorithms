@@ -192,7 +192,6 @@ namespace GPGPU
             for (int ac = 0; ac < arrayCount; ac++)
             {
                 // cleanup
-                if (ac > 0)
                 {
                     int myPart = (power + blockDim.x - 1) / blockDim.x;
                     int beginningPointer = threadIdx.x * myPart;

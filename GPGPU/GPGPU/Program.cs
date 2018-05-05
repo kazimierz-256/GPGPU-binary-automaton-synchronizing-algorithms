@@ -19,7 +19,7 @@ namespace GPGPU
             const int problemSize = 13;
             var theSolver = new IComputable[]
             {
-                //new CPU(),
+                new CPU(),
                 new SlimCPU(),
                 new SlimGPU(),
                 //new SlimCPUGPU(),

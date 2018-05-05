@@ -28,10 +28,10 @@ namespace AlgorithmCorrectnessTestProject
             var computables = new IComputable[] {
                 new CPU(),
                 new SlimCPU(),
-                new SlimGPU(),// we're having issues with memory allocation...
+                //new SlimGPU(),// we're having issues with memory allocation...
                 new SlimGPUQueue(),
-                new SlimCPUGPU(),
-                new SlimCPUGPUInbetween(),
+                //new SlimCPUGPU(),
+                //new SlimCPUGPUInbetween(),
             };
             foreach (var seed in seeds)
             {

@@ -147,6 +147,20 @@ namespace GPGPU
             DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount[0]; ac++)
             {
+                {
+                    // cleanup
+                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
+                    {
+                        isDiscoveredPtr[consideringVertex] = false;
+                        isToBeProcessedDuringNextIteration[consideringVertex] = false;
+                        isToBeProcessedDuringNextIterationOdd[consideringVertex] = consideringVertex == power - 1;
+                        shouldStop[0] = false;
+                        correctlyProcessed = 0;
+                        nextDistance = 1;
+                        addedSomethingThisRound[0] = false;
+                    }
+                    DeviceFunction.SyncThreads();
+                }
                 while (correctlyProcessed < endingPointer - beginningPointer && !shouldStop[0])
                 {
                     var nextIterationRead = nextDistance % 2 == 0 ? isToBeProcessedDuringNextIteration : isToBeProcessedDuringNextIterationOdd;
@@ -213,22 +227,7 @@ namespace GPGPU
                     addedSomethingThisRound[0] = false;
                     DeviceFunction.SyncThreads();
                 }
-
-                if (ac < arrayCount[0] - 1)
-                {
-                    // cleanup
-                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
-                    {
-                        isDiscoveredPtr[consideringVertex] = false;
-                        isToBeProcessedDuringNextIteration[consideringVertex] = false;
-                        isToBeProcessedDuringNextIterationOdd[consideringVertex] = consideringVertex == power - 1;
-                        shouldStop[0] = false;
-                        correctlyProcessed = 0;
-                        nextDistance = 1;
-                        addedSomethingThisRound[0] = false;
-                    }
-                    DeviceFunction.SyncThreads();
-                }
+                
             }
         }
         public int GetBestParallelism() => 4;
