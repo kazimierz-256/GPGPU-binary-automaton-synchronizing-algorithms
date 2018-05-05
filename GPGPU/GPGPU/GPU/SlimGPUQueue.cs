@@ -23,7 +23,7 @@ namespace GPGPU
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1_0000_0000_0000_00)
+        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int streamCount, Action asyncAction = null, int warps = 13, int problemsPerStream = 0b1_0000_0000_0000_00, int gridDim = 4096)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -56,7 +56,7 @@ namespace GPGPU
             gpu.Copy(n, problemSize);
 
             var launchParameters = new LaunchParam(
-                new dim3(1, 1, 1),
+                new dim3(gridDim, 1, 1),
                 new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
                 sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(byte) + power * sizeof(ushort) * 2
             );
@@ -191,13 +191,19 @@ namespace GPGPU
             if (threadIdx.x == 0)
                 isDiscoveredPtr[power - 1] = true;
 
+            int acMyPart = (arrayCount + gridDim.x - 1) / gridDim.x;
+            int acBeginningPointer = blockIdx.x * acMyPart;
+            int acEndingPointer = (blockIdx.x + 1) * acMyPart;
+            if (arrayCount < acEndingPointer)
+                acEndingPointer = arrayCount;
+
             ushort nextDistance;
             int vertexAfterTransitionA,
                 vertexAfterTransitionB,
-                index = 0;
+                index = acBeginningPointer * n;
 
             DeviceFunction.SyncThreads();
-            for (int ac = 0; ac < arrayCount; ac++)
+            for (int ac = acBeginningPointer; ac < acEndingPointer; ac++)
             {
                 // cleanup
                 {
