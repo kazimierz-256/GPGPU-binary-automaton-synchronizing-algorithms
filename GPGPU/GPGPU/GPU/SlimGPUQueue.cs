@@ -39,8 +39,8 @@ namespace GPGPU
 #endif
             var gpu = Gpu.Default;
             var n = problemsToSolve.First().size;
-            if (problemsToSolve.Any(problem => problem.size != n))
-                throw new Exception("Inconsistent problem sizes");
+            //if (problemsToSolve.Any(problem => problem.size != n))
+            //    throw new Exception("Inconsistent problem sizes");
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);

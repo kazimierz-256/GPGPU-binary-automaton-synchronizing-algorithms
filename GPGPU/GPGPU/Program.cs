@@ -22,13 +22,13 @@ namespace GPGPU
             const int problemSize = 13;
             var theSolver = new IComputable[]
             {
-                new CPU(),
+                //new CPU(),
                 new SlimCPU(),
                 //new SlimGPUBuggy(),
-                //new SlimCPUGPU(),
+                new SlimCPUGPUInbetween(),
                 new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 16;
+            const long initialProblemSamplingCount = 1 << 18;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
             Gpu.Default.Device.Print();

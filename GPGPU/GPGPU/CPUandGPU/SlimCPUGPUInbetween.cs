@@ -11,7 +11,7 @@ namespace GPGPU
     public class SlimCPUGPUInbetween : IComputable
     {
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
-            => Compute(problemsToSolve, degreeOfParallelism, .5f);
+            => Compute(problemsToSolve, degreeOfParallelism, .2f);
 
         public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism, float cpuPart)
         {
@@ -20,14 +20,14 @@ namespace GPGPU
 
             var gpu = new SlimGPUQueue();
             var gpuResults = gpu.Compute(
-                problemsToSolve.Skip(cpuProblems).Take(problemsToSolve.Count() - cpuProblems),
+                problemsToSolve.Skip(cpuProblems).Take(problemsToSolve.Count() - cpuProblems).ToArray(),
                 gpu.GetBestParallelism(),
                 () =>
                 {
                     var cpu = new SlimCPU();
                     cpuResults = cpu
                        .Compute(problemsToSolve
-                           .Take(cpuProblems),
+                           .Take(cpuProblems).ToArray(),
                            cpu.GetBestParallelism());
 
                 });
