@@ -44,8 +44,19 @@ namespace GPGPU
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
-            //if (usedStreams > streamCount)
-            //    throw new Exception("Too many streams requested, bad things will happen");
+            if (usedStreams > streamCount)
+            {
+                if (streamCount < 1)
+                    throw new Exception("Incorrect number of streams");
+                else
+                {
+                    usedStreams = streamCount;
+                }
+            }
+            if (warps > gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize)
+            {
+                warps = gpu.Device.Attributes.MaxThreadsPerBlock;
+            }
 
             var problemsPerStream = problemsToSolve.Count() / usedStreams;
             var partitionCount = (problemsToSolve.Count() + problemsPerStream - 1) / problemsPerStream;
@@ -67,8 +78,8 @@ namespace GPGPU
 
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
-                new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
-                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(byte) + (power / 2 + 1) * sizeof(ushort) * 2
+                new dim3(gpu.Device.Attributes.WarpSize * warps, 1, 1),
+                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2
             );
             var gpuResultsIsSynchronizable = problemsPartitioned
                 .Select(problems => new bool[problems.Length])

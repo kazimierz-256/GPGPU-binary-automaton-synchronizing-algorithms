@@ -31,7 +31,7 @@ namespace GPGPU
             const long initialProblemSamplingCount = 1 << 16;
             double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
-
+            Gpu.Default.Device.Print();
             const int problemSeed = 123456;
             var random = new Random(problemSeed);
             var watch = new Stopwatch();
