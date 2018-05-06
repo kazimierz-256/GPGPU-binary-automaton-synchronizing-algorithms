@@ -30,7 +30,7 @@ namespace GPGPU
             int streamCount,
             Action asyncAction = null,
             int warps = 13,
-            int usedStreams = 4)
+            int usedStreams = 16)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -44,8 +44,8 @@ namespace GPGPU
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
-            if (usedStreams > streamCount)
-                throw new Exception("Too many streams requested, bad things will happen");
+            //if (usedStreams > streamCount)
+            //    throw new Exception("Too many streams requested, bad things will happen");
 
             var problemsPerStream = problemsToSolve.Count() / usedStreams;
             var partitionCount = (problemsToSolve.Count() + problemsPerStream - 1) / problemsPerStream;
@@ -68,7 +68,7 @@ namespace GPGPU
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
                 new dim3(DeviceArch.Default.WarpThreads * warps, 1, 1),
-                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(byte) + power * sizeof(ushort) * 2
+                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(byte) + (power / 2 + 1) * sizeof(ushort) * 2
             );
             var gpuResultsIsSynchronizable = problemsPartitioned
                 .Select(problems => new bool[problems.Length])
@@ -196,7 +196,7 @@ namespace GPGPU
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool)) / sizeof(ushort)).Volatile();
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + power * sizeof(ushort)) / sizeof(ushort)).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort)) / sizeof(ushort)).Volatile();
 
             if (threadIdx.x == 0)
                 isDiscoveredPtr[power - 1] = true;
@@ -303,6 +303,6 @@ namespace GPGPU
                 index += n;
             }
         }
-        public int GetBestParallelism() => 4;
+        public int GetBestParallelism() => 16;
     }
 }
