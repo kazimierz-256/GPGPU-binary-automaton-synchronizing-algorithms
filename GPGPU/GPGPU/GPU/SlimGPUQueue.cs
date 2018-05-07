@@ -29,7 +29,7 @@ namespace GPGPU
             IEnumerable<Problem> problemsToSolve,
             int streamCount,
             Action asyncAction = null,
-            int warps = 13)
+            int warps = 12)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -38,20 +38,16 @@ namespace GPGPU
 #endif
             var gpu = Gpu.Default;
             var n = problemsToSolve.First().size;
-            //if (problemsToSolve.Any(problem => problem.size != n))
-            //    throw new Exception("Inconsistent problem sizes");
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            if (warps > gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize)
-            {
-                warps = gpu.Device.Attributes.MaxThreadsPerBlock;
-            }
+            var maximumWarps = gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize;
+            if (warps > maximumWarps)
+                warps = maximumWarps;
 
             var problemsPerStream = (problemsToSolve.Count() + streamCount - 1) / streamCount;
-            var partitionCount = (problemsToSolve.Count() + problemsPerStream - 1) / problemsPerStream;
-            var problemsPartitioned = Enumerable.Range(0, partitionCount)
+            var problemsPartitioned = Enumerable.Range(0, streamCount)
                 .Select(i => problemsToSolve.Skip(problemsPerStream * i)
                     .Take(problemsPerStream)
                     .ToArray())
@@ -70,7 +66,7 @@ namespace GPGPU
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
                 new dim3(gpu.Device.Attributes.WarpSize * warps, 1, 1),
-                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2
+                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2 + 2 * n * sizeof(ushort)
             );
             var gpuResultsIsSynchronizable = problemsPartitioned
                 .Select(problems => new bool[problems.Length])
@@ -79,38 +75,19 @@ namespace GPGPU
                 .Select(problems => new int[problems.Length])
                 .ToArray();
 
-            var streamToRecover = new Queue<KeyValuePair<int, int>>(streamCount);
 
-            for (int partition = 0; partition < partitionCount; partition++)
+            for (int stream = 0; stream < streamCount; stream++)
             {
-                var problems = problemsPartitioned[partition];
+                var problems = problemsPartitioned[stream];
 
                 var matrixA = new int[problems.Length * n];
-                for (int problem = 0; problem < problems.Length; problem++)
-                    for (int i = 0; i < n; i++)
-                        matrixA[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixA[i]);
-
                 var matrixB = new int[problems.Length * n];
-                for (int problem = 0; problem < problems.Length; problem++)
-                    for (int i = 0; i < n; i++)
-                        matrixB[problem * n + i] = (ushort)(1 << problems[problem].stateTransitioningMatrixB[i]);
-
-                var stream = partition % streamCount;
-                var reusingStream = partition >= streamCount;
-                if (reusingStream)
+                Parallel.For(0, problems.Length, problem =>
                 {
-#if (benchmark)
-                    benchmarkTiming.Start();
-#endif
-                    streams[stream].Synchronize();
-                    streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[partition - streamCount]);
-#if (benchmark)
-                    benchmarkTiming.Stop();
-#endif
-                    streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[partition - streamCount]);
-                    //Gpu.FreeAllImplicitMemory();
-                    streamToRecover.Dequeue();
-                }
+                    Array.ConstrainedCopy(problems[problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
+                    Array.ConstrainedCopy(problems[problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
+                });
+
                 streams[stream].Copy(matrixA, gpuA[stream]);
                 streams[stream].Copy(matrixB, gpuB[stream]);
 
@@ -122,28 +99,26 @@ namespace GPGPU
                     isSynchronizable[stream],
                     shortestSynchronizingWordLength[stream]
                     );
-                streamToRecover.Enqueue(new KeyValuePair<int, int>(stream, partition));
             }
+
             asyncAction?.Invoke();
-            foreach (var streamPartitionKVP in streamToRecover)
+
+            for (int stream = 0; stream < streamCount; stream++)
             {
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
-                streams[streamPartitionKVP.Key].Synchronize();
-                streams[streamPartitionKVP.Key].Copy(isSynchronizable[streamPartitionKVP.Key], gpuResultsIsSynchronizable[streamPartitionKVP.Value]);
+                streams[stream].Synchronize();
+                streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[stream]);
 #if (benchmark)
                 benchmarkTiming.Stop();
 #endif
-                streams[streamPartitionKVP.Key].Copy(shortestSynchronizingWordLength[streamPartitionKVP.Key], gpuResultsShortestSynchronizingWordLength[streamPartitionKVP.Value]);
+                streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[stream]);
             }
-            //Gpu.FreeAllImplicitMemory();
-
-            //gpu.Synchronize();
 
 #if (benchmark)
 #endif
-            var results = Enumerable.Range(0, partitionCount).SelectMany(i => gpuResultsIsSynchronizable[i].Zip(gpuResultsShortestSynchronizingWordLength[i], (isSyncable, shortestWordLength)
+            var results = Enumerable.Range(0, streamCount).SelectMany(i => gpuResultsIsSynchronizable[i].Zip(gpuResultsShortestSynchronizingWordLength[i], (isSyncable, shortestWordLength)
                             => new ComputationResult()
                             {
                                 computationType = ComputationType.GPU,
@@ -165,8 +140,7 @@ namespace GPGPU
 
             if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
                 throw new Exception("Cerny conjecture is false");
-            //Console.WriteLine(results[0].isSynchronizable);
-            //Console.WriteLine(results[1].isSynchronizable);
+
 #if (benchmark)
             results[0].benchmarkResult = new BenchmarkResult
             {
@@ -199,6 +173,10 @@ namespace GPGPU
                 .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool)) / sizeof(ushort)).Volatile();
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort)) / sizeof(ushort)).Volatile();
+            var gpuA = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2) / sizeof(ushort)).Volatile();
+            var gpuB = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2 + n * sizeof(ushort)) / sizeof(ushort)).Volatile();
 
             if (threadIdx.x == 0)
                 isDiscoveredPtr[power - 1] = true;
@@ -217,6 +195,7 @@ namespace GPGPU
                     int endingPointer = beginningPointer + myPart;
                     if (power - 1 < endingPointer)
                         endingPointer = power - 1;
+                    // TODO create stride
                     for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                     {
                         isDiscoveredPtr[consideringVertex] = false;
@@ -230,6 +209,12 @@ namespace GPGPU
                     queueOdd[0] = (ushort)(power - 1);
 
                 }
+                if (threadIdx.x == DeviceFunction.WarpSize || (threadIdx.x == 0 && blockDim.x <= DeviceFunction.WarpSize))
+                    for (int i = 0; i < n; i++)
+                    {
+                        gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
+                        gpuB[i] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + i]);
+                    }
                 var readingQueue = queueOdd;
                 var writingQueue = queueEven;
                 var readingQueueCount = queueOddCount;
@@ -255,10 +240,8 @@ namespace GPGPU
                         {
                             if (0 != ((1 << i) & consideringVertex))
                             {
-                                vertexAfterTransitionA |=
-                                    precomputedStateTransitioningMatrixA[index + i];
-                                vertexAfterTransitionB |=
-                                    precomputedStateTransitioningMatrixB[index + i];
+                                vertexAfterTransitionA |= gpuA[i];
+                                vertexAfterTransitionB |= gpuB[i];
                             }
                         }
                         if (!isDiscoveredPtr[vertexAfterTransitionA])
