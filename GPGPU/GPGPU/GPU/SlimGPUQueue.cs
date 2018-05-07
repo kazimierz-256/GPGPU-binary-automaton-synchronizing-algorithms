@@ -161,22 +161,37 @@ namespace GPGPU
             var arrayCount = precomputedStateTransitioningMatrixA.Length / n;
             var power = 1 << n;
 
+            #region Pointer setup
             var queueEvenCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                .Ptr(0);
+                   .Ptr(0);
+
             var queueOddCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(sizeof(int) / sizeof(int));
+
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr((2 * sizeof(int)) / sizeof(bool)).Volatile();
+                .Ptr((2 * sizeof(int)) / sizeof(bool))
+                .Volatile();
+
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr((2 * sizeof(int) + sizeof(bool)) / sizeof(bool)).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool)) / sizeof(bool))
+                .Volatile();
+
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool)) / sizeof(ushort)).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool)) / sizeof(ushort))
+                .Volatile();
+
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort)) / sizeof(ushort)).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort)) / sizeof(ushort))
+                .Volatile();
+
             var gpuA = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2) / sizeof(ushort)).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2) / sizeof(ushort))
+                .Volatile();
+
             var gpuB = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2 + n * sizeof(ushort)) / sizeof(ushort)).Volatile();
+                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2 + n * sizeof(ushort)) / sizeof(ushort))
+                .Volatile();
+            #endregion
 
             if (threadIdx.x == 0)
                 isDiscoveredPtr[power - 1] = true;
@@ -184,23 +199,22 @@ namespace GPGPU
             ushort nextDistance;
             int vertexAfterTransitionA,
                 vertexAfterTransitionB,
-                index = 0;
+                index;
+            var acPart = (arrayCount + gridDim.x - 1) / gridDim.x;
+            var acBegin = blockIdx.x * acPart;
+            var acEnd = acBegin + acPart;
+            if (arrayCount < acEnd)
+                acEnd = arrayCount;
+            index = acBegin * n;
             DeviceFunction.SyncThreads();
-            for (int ac = 0; ac < arrayCount; ac++)
+            for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                {
-                    int myPart = (power + blockDim.x - 1) / blockDim.x;
-                    int beginningPointer = threadIdx.x * myPart;
-                    int endingPointer = beginningPointer + myPart;
-                    if (power - 1 < endingPointer)
-                        endingPointer = power - 1;
-                    // TODO create stride
-                    for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
-                    {
-                        isDiscoveredPtr[consideringVertex] = false;
-                    }
-                }
+                for (int consideringVertex = threadIdx.x, endingVertex = power - 1;
+                    consideringVertex < endingVertex;
+                    consideringVertex += blockDim.x)
+                    isDiscoveredPtr[consideringVertex] = false;
+
                 if (threadIdx.x == 0)
                 {
                     shouldStop[0] = false;
@@ -285,7 +299,6 @@ namespace GPGPU
                         writingQueueCount[0] = 0;
                     DeviceFunction.SyncThreads();
                 }
-                index += n;
             }
         }
         public int GetBestParallelism() => 16;
