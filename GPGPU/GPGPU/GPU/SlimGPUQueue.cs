@@ -29,8 +29,8 @@ namespace GPGPU
             IEnumerable<Problem> problemsToSolve,
             int streamCount,
             Action asyncAction = null,
-            int warps = 13,
-            int usedStreams = 16)
+            int warps = 2,
+            int usedStreams = 4)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -53,12 +53,16 @@ namespace GPGPU
                     usedStreams = streamCount;
                 }
             }
+            else
+            {
+                streamCount = usedStreams;
+            }
             if (warps > gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize)
             {
                 warps = gpu.Device.Attributes.MaxThreadsPerBlock;
             }
 
-            var problemsPerStream = problemsToSolve.Count() / usedStreams;
+            var problemsPerStream = (problemsToSolve.Count() + usedStreams - 1) / usedStreams;
             var partitionCount = (problemsToSolve.Count() + problemsPerStream - 1) / problemsPerStream;
             var problemsPartitioned = Enumerable.Range(0, partitionCount)
                 .Select(i => problemsToSolve.Skip(problemsPerStream * i)
@@ -192,6 +196,10 @@ namespace GPGPU
             bool[] isSynchronizing,
             int[] shortestSynchronizingWordLength)
         {
+
+            if (threadIdx.x % DeviceFunction.WarpSize == 0)
+                return;
+
             var n = problemSize.Value;
             var arrayCount = precomputedStateTransitioningMatrixA.Length / n;
             var power = 1 << n;
@@ -216,17 +224,17 @@ namespace GPGPU
             int vertexAfterTransitionA,
                 vertexAfterTransitionB,
                 index = 0;
-
             DeviceFunction.SyncThreads();
             for (int ac = 0; ac < arrayCount; ac++)
             {
                 // cleanup
                 {
-                    int myPart = (power + blockDim.x - 1) / blockDim.x;
+                    int myPart = (power + blockDim.x * DeviceFunction.WarpSize - 1) / (blockDim.x * DeviceFunction.WarpSize);
                     int beginningPointer = threadIdx.x * myPart;
-                    int endingPointer = (threadIdx.x + 1) * myPart;
+                    int endingPointer = beginningPointer + myPart;
                     if (power - 1 < endingPointer)
                         endingPointer = power - 1;
+
                     for (int consideringVertex = beginningPointer; consideringVertex < endingPointer; consideringVertex++)
                     {
                         isDiscoveredPtr[consideringVertex] = false;
@@ -251,11 +259,12 @@ namespace GPGPU
 
                 while (readingQueueCountCached > 0 && !shouldStop[0])
                 {
-                    int myPart = (readingQueueCountCached + blockDim.x - 1) / blockDim.x;
+                    int myPart = (readingQueueCountCached + blockDim.x * DeviceFunction.WarpSize - 1) / (blockDim.x * DeviceFunction.WarpSize);
                     int beginningPointer = threadIdx.x * myPart;
-                    int endingPointer = (threadIdx.x + 1) * myPart;
+                    int endingPointer = beginningPointer + myPart;
                     if (readingQueueCountCached < endingPointer)
                         endingPointer = readingQueueCountCached;
+                    //Console.WriteLine("ac {3}, threadix {0}, begin {1}, end {2}", threadIdx.x, beginningPointer, endingPointer, ac);
                     for (int iter = beginningPointer; iter < endingPointer; ++iter)
                     {
                         int consideringVertex = readingQueue[iter];
@@ -314,6 +323,6 @@ namespace GPGPU
                 index += n;
             }
         }
-        public int GetBestParallelism() => 16;
+        public int GetBestParallelism() => int.MaxValue;
     }
 }

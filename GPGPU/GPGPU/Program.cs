@@ -20,16 +20,16 @@ namespace GPGPU
         {
             #region Program definitions
             const int problemSize = 13;
+            var n = 1 << 18;
             var theSolver = new IComputable[]
             {
                 //new CPU(),
                 new SlimCPU(),
                 //new SlimGPUBuggy(),
-                new SlimCPUGPUInbetween(),
+                //new SlimCPUGPUInbetween(),
                 new SlimGPUQueue(),
             };
-            const long initialProblemSamplingCount = 1 << 18;
-            double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
+            //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
             Gpu.Default.Device.Print();
             const int problemSeed = 123456;
@@ -41,8 +41,9 @@ namespace GPGPU
             var resultsDictionary = new List<ComputationResult>();
 
             // in a loop check the performance of the CPU
-            double doublePrecisionN = initialProblemSamplingCount;
-            for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            //double doublePrecisionN = initialProblemSamplingCount;
+            //for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            for (int i = 0; i < 10; i++)
             {
                 var localSeed = random.Next();
                 foreach (var solver in theSolver)
