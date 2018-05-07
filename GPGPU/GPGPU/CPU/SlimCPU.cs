@@ -95,9 +95,9 @@ namespace GPGPU
                 // note: consideringVertex cannot ever be equal to 0
 
                 // watch out for the index range in the for loop
-                for (int i = 0; i < n; i++)
+                for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
                 {
-                    if (0 != ((1 << i) & consideringVertex))
+                    if (0 != (mask & consideringVertex))
                     {
                         vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
                         vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];

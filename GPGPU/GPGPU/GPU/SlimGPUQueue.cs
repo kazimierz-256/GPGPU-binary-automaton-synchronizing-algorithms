@@ -250,9 +250,9 @@ namespace GPGPU
                     {
                         int consideringVertex = readingQueue[iter];
                         vertexAfterTransitionA = vertexAfterTransitionB = 0;
-                        for (int i = 0; i < n; i++)
+                        for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
                         {
-                            if (0 != ((1 << i) & consideringVertex))
+                            if (0 != (mask & consideringVertex))
                             {
                                 vertexAfterTransitionA |= gpuA[i];
                                 vertexAfterTransitionB |= gpuB[i];
