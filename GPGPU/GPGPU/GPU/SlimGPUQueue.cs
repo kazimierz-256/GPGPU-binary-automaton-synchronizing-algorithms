@@ -18,7 +18,7 @@ namespace GPGPU
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
         public ComputationResult ComputeOne(Problem problemToSolve)
-        => Compute(new[] { problemToSolve }, 1)[0];
+        => Compute(new[] { problemToSolve }, 1).First();
 
         public ComputationResult[] Compute(
             IEnumerable<Problem> problemsToSolve,
@@ -66,7 +66,11 @@ namespace GPGPU
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
                 new dim3(gpu.Device.Attributes.WarpSize * warps, 1, 1),
-                sizeof(int) * 2 + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2 + 2 * n * sizeof(ushort)
+                sizeof(int) * 2
+                + sizeof(bool) * 2
+                + power * sizeof(bool)
+                + (power / 2 + 1) * sizeof(ushort) * 2
+                + 2 * n * sizeof(ushort)
             );
             var gpuResultsIsSynchronizable = problemsPartitioned
                 .Select(problems => new bool[problems.Length])
@@ -164,32 +168,40 @@ namespace GPGPU
             #region Pointer setup
             var queueEvenCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                    .Ptr(0);
+            var byteOffset = sizeof(int);
 
             var queueOddCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                .Ptr(sizeof(int) / sizeof(int));
+                .Ptr(byteOffset / sizeof(int));
+            byteOffset += sizeof(int);
 
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr((2 * sizeof(int)) / sizeof(bool))
+                .Ptr(byteOffset / sizeof(bool))
                 .Volatile();
+            byteOffset += sizeof(bool) * 2;
 
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr((2 * sizeof(int) + sizeof(bool)) / sizeof(bool))
+                .Ptr(byteOffset / sizeof(bool))
                 .Volatile();
+            byteOffset += power * sizeof(bool);
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool)) / sizeof(ushort))
+                .Ptr(byteOffset / sizeof(ushort))
                 .Volatile();
+            byteOffset += (power / 2 + 1) * sizeof(ushort);
 
             var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort)) / sizeof(ushort))
+                .Ptr(byteOffset / sizeof(ushort))
                 .Volatile();
+            byteOffset += (power / 2 + 1) * sizeof(ushort);
+
 
             var gpuA = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2) / sizeof(ushort))
+                .Ptr(byteOffset / sizeof(ushort))
                 .Volatile();
+            byteOffset += n * sizeof(ushort);
 
             var gpuB = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr((2 * sizeof(int) + sizeof(bool) * 2 + power * sizeof(bool) + (power / 2 + 1) * sizeof(ushort) * 2 + n * sizeof(ushort)) / sizeof(ushort))
+                .Ptr(byteOffset / sizeof(ushort))
                 .Volatile();
             #endregion
 
