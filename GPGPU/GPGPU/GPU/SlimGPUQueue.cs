@@ -29,7 +29,8 @@ namespace GPGPU
             IEnumerable<Problem> problemsToSolve,
             int streamCount,
             Action asyncAction = null,
-            int warps = 12)
+            int warps = 8)
+        // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -271,43 +272,50 @@ namespace GPGPU
                         }
 
                         var eightTimesRemainder = (vertexAfterTransitionA % 4) << 3;
-                        var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
-                        if (0 == beforeAdded)
-                        {
-                            if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
-                            {
-                                shortestSynchronizingWordLength[ac] = nextDistance;
-                                isSynchronizing[ac] = true;
-                                shouldStop[0] = true;
-                                break;
-                            }
 
-                            var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
-                            writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
-                        }
-                        else
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA >> 2] & (255 << eightTimesRemainder)))
                         {
-                            DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder);
+                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
+                            if (0 == beforeAdded)
+                            {
+                                if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
+                                {
+                                    shortestSynchronizingWordLength[ac] = nextDistance;
+                                    isSynchronizing[ac] = true;
+                                    shouldStop[0] = true;
+                                    break;
+                                }
+
+                                var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
+                                writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
+                            }
+                            else
+                            {
+                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder);
+                            }
                         }
 
                         eightTimesRemainder = (vertexAfterTransitionB % 4) << 3;
-                        beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
-                        if (0 == beforeAdded)
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB >> 2] & (255 << eightTimesRemainder)))
                         {
-                            if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
+                            if (0 == beforeAdded)
                             {
-                                shortestSynchronizingWordLength[ac] = nextDistance;
-                                isSynchronizing[ac] = true;
-                                shouldStop[0] = true;
-                                break;
-                            }
+                                if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+                                {
+                                    shortestSynchronizingWordLength[ac] = nextDistance;
+                                    isSynchronizing[ac] = true;
+                                    shouldStop[0] = true;
+                                    break;
+                                }
 
-                            var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
-                            writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
-                        }
-                        else
-                        {
-                            DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder);
+                                var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
+                                writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
+                            }
+                            else
+                            {
+                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder);
+                            }
                         }
                     }
                     ++nextDistance;
