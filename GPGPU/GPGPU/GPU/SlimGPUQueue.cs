@@ -53,7 +53,7 @@ namespace GPGPU
                     .ToArray())
                 .Where(partition => partition.Length > 0)
                 .ToArray();
-
+            streamCount = problemsPartitioned.Length;
             var streams = Enumerable.Range(0, streamCount)
                 .Select(_ => gpu.CreateStream()).ToArray();
 
@@ -67,8 +67,8 @@ namespace GPGPU
                 new dim3(1, 1, 1),
                 new dim3(gpu.Device.Attributes.WarpSize * warps, 1, 1),
                 sizeof(int) * 2
-                + sizeof(bool) * 2
-                + power * sizeof(bool)
+                + sizeof(bool) * 4
+                + power * sizeof(byte)
                 + (power / 2 + 1) * sizeof(ushort) * 2
                 + 2 * n * sizeof(ushort)
             );
@@ -113,12 +113,14 @@ namespace GPGPU
                 benchmarkTiming.Start();
 #endif
                 streams[stream].Synchronize();
-                streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[stream]);
 #if (benchmark)
                 benchmarkTiming.Stop();
 #endif
+                streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[stream]);
                 streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[stream]);
             }
+
+            gpu.Synchronize();
 
 #if (benchmark)
 #endif
@@ -177,12 +179,11 @@ namespace GPGPU
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
                 .Ptr(byteOffset / sizeof(bool))
                 .Volatile();
-            byteOffset += sizeof(bool) * 2;
+            byteOffset += sizeof(bool) * 4;
 
-            var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr(byteOffset / sizeof(bool))
-                .Volatile();
-            byteOffset += power * sizeof(bool);
+            var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
+                .Ptr(byteOffset / sizeof(int));
+            byteOffset += power * sizeof(byte);
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(byteOffset / sizeof(ushort))
@@ -205,9 +206,6 @@ namespace GPGPU
                 .Volatile();
             #endregion
 
-            if (threadIdx.x == 0)
-                isDiscoveredPtr[power - 1] = true;
-
             ushort nextDistance;
             int vertexAfterTransitionA,
                 vertexAfterTransitionB,
@@ -222,10 +220,10 @@ namespace GPGPU
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                for (int consideringVertex = threadIdx.x, endingVertex = power - 1;
+                for (int consideringVertex = threadIdx.x, endingVertex = power >> 2;
                     consideringVertex < endingVertex;
                     consideringVertex += blockDim.x)
-                    isDiscoveredPtr[consideringVertex] = false;
+                    isDiscoveredPtr[consideringVertex] = 0;
 
                 if (threadIdx.x == 0)
                 {
@@ -233,7 +231,8 @@ namespace GPGPU
                     queueEvenCount[0] = 0;
                     queueOddCount[0] = 1;
                     queueOdd[0] = (ushort)(power - 1);
-
+                    // assuming n >= 2
+                    isDiscoveredPtr[(power - 1) >> 2] = 1 << 24;
                 }
                 if (threadIdx.x == DeviceFunction.WarpSize || (threadIdx.x == 0 && blockDim.x <= DeviceFunction.WarpSize))
                     for (int i = 0; i < n; i++)
@@ -270,7 +269,10 @@ namespace GPGPU
                                 vertexAfterTransitionB |= gpuB[i];
                             }
                         }
-                        if (!isDiscoveredPtr[vertexAfterTransitionA])
+
+                        var eightTimesRemainder = (vertexAfterTransitionA % 4) << 3;
+                        var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
+                        if (0 == beforeAdded)
                         {
                             if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
                             {
@@ -280,12 +282,17 @@ namespace GPGPU
                                 break;
                             }
 
-                            isDiscoveredPtr[vertexAfterTransitionA] = true;
                             var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
                         }
+                        else
+                        {
+                            DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder);
+                        }
 
-                        if (!isDiscoveredPtr[vertexAfterTransitionB])
+                        eightTimesRemainder = (vertexAfterTransitionB % 4) << 3;
+                        beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
+                        if (0 == beforeAdded)
                         {
                             if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
                             {
@@ -295,9 +302,12 @@ namespace GPGPU
                                 break;
                             }
 
-                            isDiscoveredPtr[vertexAfterTransitionB] = true;
                             var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
                             writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
+                        }
+                        else
+                        {
+                            DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder);
                         }
                     }
                     ++nextDistance;

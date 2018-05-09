@@ -18,12 +18,12 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void CheckIntegrity()
         {
-            var n = 1<<15;
+            var n = 1<<19;
             // there are issues with multiple sized problems!
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
             var sizes = Enumerable.Range(13, 1).ToArray();
-            var seeds = Enumerable.Range(123456, 4).ToArray();
+            var seeds = Enumerable.Range(123456, 1).ToArray();
 
             var computables = new IComputable[] {
                 //new CPU(),
