@@ -18,7 +18,7 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void CheckIntegrity()
         {
-            var n = 1<<10;
+            var n = 1 << 15;
             // there are issues with multiple sized problems!
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
