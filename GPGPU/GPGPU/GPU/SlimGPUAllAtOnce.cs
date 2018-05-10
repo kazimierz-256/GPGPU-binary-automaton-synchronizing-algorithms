@@ -13,7 +13,7 @@ using System.Diagnostics;
 
 namespace GPGPU
 {
-    public class SlimGPUQueue : IComputable
+    public class SlimGPUAllAtOnce : IComputable
     {
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
@@ -69,8 +69,7 @@ namespace GPGPU
                 new dim3(gpu.Device.Attributes.WarpSize * warps, 1, 1),
                 sizeof(int) * 2
                 + sizeof(bool) * 4
-                + power * sizeof(int) / 4
-                + (power / 2 + 1) * sizeof(ushort) * 2
+                + power * sizeof(bool) * 2
                 + 2 * n * sizeof(ushort)
             );
             var gpuResultsIsSynchronizable = problemsPartitioned
@@ -182,19 +181,17 @@ namespace GPGPU
                 .Volatile();
             byteOffset += sizeof(bool) * 4;
 
-            var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                .Ptr(byteOffset / sizeof(int));
-            byteOffset += power * sizeof(int) / 4;
-
-            var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(byteOffset / sizeof(ushort))
+            var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
+                .Ptr(byteOffset / sizeof(bool))
                 .Volatile();
-            byteOffset += (power / 2 + 1) * sizeof(ushort);
+            byteOffset += power * sizeof(bool);
 
-            var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(byteOffset / sizeof(ushort))
+            var queueOdd = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
+                .Ptr(byteOffset / sizeof(bool))
                 .Volatile();
-            byteOffset += (power / 2 + 1) * sizeof(ushort);
+            byteOffset += power * sizeof(bool);
+
+            // make checkpoints for first & last uncovery indexkds like power / blovkdim.x
 
 
             var gpuA = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
@@ -218,118 +215,118 @@ namespace GPGPU
                 acEnd = arrayCount;
             index = acBegin * n;
             DeviceFunction.SyncThreads();
-            for (int ac = acBegin; ac < acEnd; ac++, index += n)
-            {
-                // cleanup
-                for (int consideringVertex = threadIdx.x, endingVertex = power >> 2;
-                    consideringVertex < endingVertex;
-                    consideringVertex += blockDim.x)
-                    isDiscoveredPtr[consideringVertex] = 0;
+            //for (int ac = acBegin; ac < acEnd; ac++, index += n)
+            //{
+            //    // cleanup
+            //    for (int consideringVertex = threadIdx.x, endingVertex = power >> 2;
+            //        consideringVertex < endingVertex;
+            //        consideringVertex += blockDim.x)
+            //        isDiscoveredPtr[consideringVertex] = 0;
 
-                if (threadIdx.x == 0)
-                {
-                    shouldStop[0] = false;
-                    queueEvenCount[0] = 0;
-                    queueOddCount[0] = 1;
-                    queueOdd[0] = (ushort)(power - 1);
-                    // assuming n >= 2
-                    isDiscoveredPtr[(power - 1) >> 2] = 1 << 24;
-                }
-                if (threadIdx.x == DeviceFunction.WarpSize || (threadIdx.x == 0 && blockDim.x <= DeviceFunction.WarpSize))
-                    for (int i = 0; i < n; i++)
-                    {
-                        gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
-                        gpuB[i] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + i]);
-                    }
-                var readingQueue = queueOdd;
-                var writingQueue = queueEven;
-                var readingQueueCount = queueOddCount;
-                var writingQueueCount = queueEvenCount;
+            //    if (threadIdx.x == 0)
+            //    {
+            //        shouldStop[0] = false;
+            //        queueEvenCount[0] = 0;
+            //        queueOddCount[0] = 1;
+            //        queueOdd[0] = (ushort)(power - 1);
+            //        // assuming n >= 2
+            //        isDiscoveredPtr[(power - 1) >> 2] = 1 << 24;
+            //    }
+            //    if (threadIdx.x == DeviceFunction.WarpSize || (threadIdx.x == 0 && blockDim.x <= DeviceFunction.WarpSize))
+            //        for (int i = 0; i < n; i++)
+            //        {
+            //            gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
+            //            gpuB[i] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + i]);
+            //        }
+            //    var readingQueue = queueOdd;
+            //    var writingQueue = queueEven;
+            //    var readingQueueCount = queueOddCount;
+            //    var writingQueueCount = queueEvenCount;
 
-                nextDistance = 1;
-                int readingQueueCountCached = 1;
-                DeviceFunction.SyncThreads();
+            //    nextDistance = 1;
+            //    int readingQueueCountCached = 1;
+            //    DeviceFunction.SyncThreads();
 
-                while (readingQueueCountCached > 0 && !shouldStop[0])
-                {
-                    int myPart = (readingQueueCountCached + blockDim.x - 1) / blockDim.x;
-                    int beginningPointer = threadIdx.x * myPart;
-                    int endingPointer = beginningPointer + myPart;
-                    if (readingQueueCountCached < endingPointer)
-                        endingPointer = readingQueueCountCached;
-                    //Console.WriteLine("ac {3}, threadix {0}, begin {1}, end {2}", threadIdx.x, beginningPointer, endingPointer, ac);
-                    for (int iter = beginningPointer; iter < endingPointer; ++iter)
-                    {
-                        int consideringVertex = readingQueue[iter];
-                        vertexAfterTransitionA = vertexAfterTransitionB = 0;
-                        for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
-                        {
-                            if (0 != (mask & consideringVertex))
-                            {
-                                vertexAfterTransitionA |= gpuA[i];
-                                vertexAfterTransitionB |= gpuB[i];
-                            }
-                        }
+            //    while (readingQueueCountCached > 0 && !shouldStop[0])
+            //    {
+            //        int myPart = (readingQueueCountCached + blockDim.x - 1) / blockDim.x;
+            //        int beginningPointer = threadIdx.x * myPart;
+            //        int endingPointer = beginningPointer + myPart;
+            //        if (readingQueueCountCached < endingPointer)
+            //            endingPointer = readingQueueCountCached;
+            //        //Console.WriteLine("ac {3}, threadix {0}, begin {1}, end {2}", threadIdx.x, beginningPointer, endingPointer, ac);
+            //        for (int iter = beginningPointer; iter < endingPointer; ++iter)
+            //        {
+            //            int consideringVertex = readingQueue[iter];
+            //            vertexAfterTransitionA = vertexAfterTransitionB = 0;
+            //            for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
+            //            {
+            //                if (0 != (mask & consideringVertex))
+            //                {
+            //                    vertexAfterTransitionA |= gpuA[i];
+            //                    vertexAfterTransitionB |= gpuB[i];
+            //                }
+            //            }
 
-                        var eightTimesRemainder = (vertexAfterTransitionA % 4) << 3;
+            //            var eightTimesRemainder = (vertexAfterTransitionA % 4) << 3;
 
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA >> 2] & (255 << eightTimesRemainder)))
-                        {
-                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
-                            if (0 == beforeAdded)
-                            {
-                                if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
-                                {
-                                    shortestSynchronizingWordLength[ac] = nextDistance;
-                                    isSynchronizing[ac] = true;
-                                    shouldStop[0] = true;
-                                    break;
-                                }
+            //            if (0 == (isDiscoveredPtr[vertexAfterTransitionA >> 2] & (255 << eightTimesRemainder)))
+            //            {
+            //                var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
+            //                if (0 == beforeAdded)
+            //                {
+            //                    if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
+            //                    {
+            //                        shortestSynchronizingWordLength[ac] = nextDistance;
+            //                        isSynchronizing[ac] = true;
+            //                        shouldStop[0] = true;
+            //                        break;
+            //                    }
 
-                                var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
-                                writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
-                            }
-                            else
-                            {
-                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder);
-                            }
-                        }
+            //                    var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
+            //                    writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
+            //                }
+            //                else
+            //                {
+            //                    DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder);
+            //                }
+            //            }
 
-                        eightTimesRemainder = (vertexAfterTransitionB % 4) << 3;
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB >> 2] & (255 << eightTimesRemainder)))
-                        {
-                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
-                            if (0 == beforeAdded)
-                            {
-                                if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
-                                {
-                                    shortestSynchronizingWordLength[ac] = nextDistance;
-                                    isSynchronizing[ac] = true;
-                                    shouldStop[0] = true;
-                                    break;
-                                }
+            //            eightTimesRemainder = (vertexAfterTransitionB % 4) << 3;
+            //            if (0 == (isDiscoveredPtr[vertexAfterTransitionB >> 2] & (255 << eightTimesRemainder)))
+            //            {
+            //                var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
+            //                if (0 == beforeAdded)
+            //                {
+            //                    if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+            //                    {
+            //                        shortestSynchronizingWordLength[ac] = nextDistance;
+            //                        isSynchronizing[ac] = true;
+            //                        shouldStop[0] = true;
+            //                        break;
+            //                    }
 
-                                var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
-                                writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
-                            }
-                            else
-                            {
-                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder);
-                            }
-                        }
-                    }
-                    ++nextDistance;
-                    readingQueue = nextDistance % 2 == 0 ? queueEven : queueOdd;
-                    writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
-                    readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
-                    writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
-                    DeviceFunction.SyncThreads();
-                    readingQueueCountCached = nextDistance % 2 == 0 ? queueEvenCount[0] : queueOddCount[0];
-                    if (threadIdx.x == 0)
-                        writingQueueCount[0] = 0;
-                    DeviceFunction.SyncThreads();
-                }
-            }
+            //                    var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
+            //                    writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
+            //                }
+            //                else
+            //                {
+            //                    DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder);
+            //                }
+            //            }
+            //        }
+            //        ++nextDistance;
+            //        readingQueue = nextDistance % 2 == 0 ? queueEven : queueOdd;
+            //        writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
+            //        readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
+            //        writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
+            //        DeviceFunction.SyncThreads();
+            //        readingQueueCountCached = nextDistance % 2 == 0 ? queueEvenCount[0] : queueOddCount[0];
+            //        if (threadIdx.x == 0)
+            //            writingQueueCount[0] = 0;
+            //        DeviceFunction.SyncThreads();
+            //    }
+            //}
         }
         public int GetBestParallelism() => 16;
     }

@@ -115,7 +115,7 @@ namespace GPGPU
             isDiscovered[initialVertex] = true;
 
             // HACK: forbid reusing of resources
-            if (reuseResources && false)
+            if (reuseResources)
             {
                 // use whatever size is needed, they all should be consistent (of same size)
                 if (previousVertexReusable.Length != powerSetCount)
@@ -280,7 +280,7 @@ namespace GPGPU
             result.benchmarkResult.totalTime = totalTiming.Elapsed;
             return result;
         }
-        public int GetBestParallelism() => 8;
+        public int GetBestParallelism() => 2;
 
     }
 }

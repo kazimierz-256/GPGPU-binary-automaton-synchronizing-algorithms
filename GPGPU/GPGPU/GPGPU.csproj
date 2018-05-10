@@ -79,6 +79,7 @@
     <Compile Include="CPUandGPU\SlimCPUGPU.cs" />
     <Compile Include="CPUandGPU\SlimCPUGPUInbetween.cs" />
     <Compile Include="CPU\SlimCPU.cs" />
+    <Compile Include="GPU\SlimGPUAllAtOnce.cs" />
     <Compile Include="Interfaces\IComputable.cs" />
     <Compile Include="Result veryfier\Verify.cs" />
     <Compile Include="Shared\BenchmarkResult.cs" />
