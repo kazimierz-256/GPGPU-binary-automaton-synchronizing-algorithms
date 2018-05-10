@@ -23,6 +23,7 @@ namespace GPGPU
             var n = 1 << 18;
             var theSolver = new IComputable[]
             {
+                new SlimGPUAllAtOnce(),
                 new CPU(),
                 new SlimCPU(),
                 //new SlimGPUBuggy(),

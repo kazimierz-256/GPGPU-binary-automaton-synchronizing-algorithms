@@ -18,7 +18,7 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void CheckIntegrity()
         {
-            var n = 1<<16;
+            var n = 1<<10;
             // there are issues with multiple sized problems!
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
@@ -29,9 +29,10 @@ namespace AlgorithmCorrectnessTestProject
                 new CPU(),
                 new SlimCPU(),
                 //new SlimGPU(),// we're having issues with memory allocation...
-                new SlimGPUQueue(),
+                //new SlimGPUQueue(),
                 //new SlimCPUGPU(),
                 //new SlimCPUGPUInbetween(),
+                new SlimGPUAllAtOnce(),
             };
             foreach (var seed in seeds)
             {

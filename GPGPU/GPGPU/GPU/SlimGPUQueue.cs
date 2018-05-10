@@ -29,7 +29,7 @@ namespace GPGPU
             IEnumerable<Problem> problemsToSolve,
             int streamCount,
             Action asyncAction = null,
-            int warps = 8)
+            int warpCount = 8)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
@@ -44,8 +44,8 @@ namespace GPGPU
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
             var maximumWarps = gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize;
-            if (warps > maximumWarps)
-                warps = maximumWarps;
+            if (warpCount > maximumWarps)
+                warpCount = maximumWarps;
 
             var problemsPerStream = (problemsToSolve.Count() + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
@@ -66,12 +66,12 @@ namespace GPGPU
 
             var launchParameters = new LaunchParam(
                 new dim3(1, 1, 1),
-                new dim3(gpu.Device.Attributes.WarpSize * warps, 1, 1),
+                new dim3(gpu.Device.Attributes.WarpSize * warpCount, 1, 1),
                 sizeof(int) * 2
-                + sizeof(bool) * 4
                 + power * sizeof(int) / 4
                 + (power / 2 + 1) * sizeof(ushort) * 2
                 + 2 * n * sizeof(ushort)
+                + sizeof(bool)
             );
             var gpuResultsIsSynchronizable = problemsPartitioned
                 .Select(problems => new bool[problems.Length])
@@ -177,11 +177,6 @@ namespace GPGPU
                 .Ptr(byteOffset / sizeof(int));
             byteOffset += sizeof(int);
 
-            var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
-                .Ptr(byteOffset / sizeof(bool))
-                .Volatile();
-            byteOffset += sizeof(bool) * 4;
-
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
             byteOffset += power * sizeof(int) / 4;
@@ -205,6 +200,12 @@ namespace GPGPU
             var gpuB = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(byteOffset / sizeof(ushort))
                 .Volatile();
+            byteOffset += n * sizeof(ushort);
+
+            var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
+                .Ptr(byteOffset / sizeof(bool))
+                .Volatile();
+            byteOffset += sizeof(bool);
             #endregion
 
             ushort nextDistance;
@@ -221,7 +222,7 @@ namespace GPGPU
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                for (int consideringVertex = threadIdx.x, endingVertex = power >> 2;
+                for (int consideringVertex = threadIdx.x, endingVertex = (power - 1) >> 2;
                     consideringVertex < endingVertex;
                     consideringVertex += blockDim.x)
                     isDiscoveredPtr[consideringVertex] = 0;
@@ -261,6 +262,7 @@ namespace GPGPU
                     for (int iter = beginningPointer; iter < endingPointer; ++iter)
                     {
                         int consideringVertex = readingQueue[iter];
+
                         vertexAfterTransitionA = vertexAfterTransitionB = 0;
                         for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
                         {
