@@ -18,33 +18,35 @@ namespace GPGPU
     {
         static void Main(string[] args)
         {
+
             #region Program definitions
             const int problemSize = 13;
-            var n = 1 << 18;
+            //var n = 1 << 18;
             var theSolver = new IComputable[]
             {
                 new SlimGPUAllAtOnce(),
-                new CPU(),
+                //new CPU(),
                 new SlimCPU(),
-                //new SlimGPUBuggy(),
                 //new SlimCPUGPUInbetween(),
                 new SlimGPUQueue(),
             };
             //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
             Gpu.Default.Device.Print();
-            const int problemSeed = 123456;
+            const int problemSeed = 1234567;
             var random = new Random(problemSeed);
             var watch = new Stopwatch();
 
             var version = theSolver.GetType().Namespace;
-            var csvBuilder = new StringBuilder("problemcount,cputime,gputime,cpugpucombinedtime");
+            var csvBuilder = new StringBuilder("problemsize,problemcount,SlimGPUAllTOnce,SlimCPU,SlimGPUQueue");
             var resultsDictionary = new List<ComputationResult>();
 
+            var sizeIncrease = 1;
+            var initialProblemSamplingCount = 1 << 18;
             // in a loop check the performance of the CPU
-            //double doublePrecisionN = initialProblemSamplingCount;
-            //for (int n = (int)doublePrecisionN; ; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
-            for (int i = 0; i < 10; i++)
+            double doublePrecisionN = initialProblemSamplingCount;
+            for (int n = (int)doublePrecisionN; n < (1 << 19); n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            //for (int i = 0; i < 10; i++)
             {
                 var localSeed = random.Next();
                 foreach (var solver in theSolver)
@@ -61,14 +63,18 @@ namespace GPGPU
                     watch.Start();
                     var results = solver.Compute(problems, solver.GetBestParallelism());
                     watch.Stop();
-
+                    var summary = new ComputationResultSummary();
+                    // TODO: fill in summary
+                    // TODO: pump summary into csv builder
+                    // TODO: export to csv
+                    // TODO: create a google docs
                     var computationElapsed = watch.Elapsed;
                     var benchmarkedResults = results.Where(result => result.benchmarkResult != null && result.benchmarkResult.benchmarkedTime != null && result.benchmarkResult.totalTime != null);
-                    var fractionOfTime = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
+                    var computationToTotalFraction = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
                         / benchmarkedResults.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
-                    Console.WriteLine(fractionOfTime);
-                    watch.Reset();
-                    watch.Start();
+                    Console.WriteLine(computationToTotalFraction);
+                    //watch.Reset();
+                    //watch.Start();
                     //if (!(
                     //        results.Zip(problems, (result, problem) =>
                     //            !result.isSynchronizable || Verify.VerifyValidityOfSynchronizingWord(problem, result, degreeOfParallelism)
@@ -81,7 +87,7 @@ namespace GPGPU
                     //{
                     //    throw new Exception("Incorrect algorithm");
                     //}
-                    watch.Stop();
+                    //watch.Stop();
 
                     var verificationElapsed = watch.Elapsed;
 
@@ -120,17 +126,13 @@ namespace GPGPU
                     #endregion
                     //Console.WriteLine(results.Average(result => result.queueBreadth));
 
+                    //save appropriate statistical data to a file from resultsDictionary
+                    System.IO.File.WriteAllText($@"./gpgpu.csv", csvBuilder.ToString());
                     Console.WriteLine();
                     Console.WriteLine();
                 }
 
-                // in a loop check the performance of the GPU
 
-
-                // in a loop check the performance of CPU + GPU combined!
-
-
-                //save appropriate statistical data to a file
             }
         }
     }

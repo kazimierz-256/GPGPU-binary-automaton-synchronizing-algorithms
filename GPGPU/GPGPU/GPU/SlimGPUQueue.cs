@@ -131,7 +131,8 @@ namespace GPGPU
                                 computationType = ComputationType.GPU,
                                 size = problemsToSolve.First().size,
                                 isSynchronizable = isSyncable,
-                                shortestSynchronizingWordLength = shortestWordLength
+                                shortestSynchronizingWordLength = shortestWordLength,
+                                algorithmName = GetType().Name
                             }
                 ).ToArray()
             ).ToArray();

@@ -243,6 +243,7 @@ namespace GPGPU
                 computationType = ComputationType.CPU_Serial,
                 queueBreadth = maximumBreadth,
                 size = n,
+                algorithmName = GetType().Name
                 //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
             };
 

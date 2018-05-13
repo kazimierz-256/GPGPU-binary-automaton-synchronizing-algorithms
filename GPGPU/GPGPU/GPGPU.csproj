@@ -83,6 +83,7 @@
     <Compile Include="Interfaces\IComputable.cs" />
     <Compile Include="Result veryfier\Verify.cs" />
     <Compile Include="Shared\BenchmarkResult.cs" />
+    <Compile Include="Shared\ComputationResultSummary.cs" />
     <Compile Include="Shared\ComputationType.cs" />
     <Compile Include="Shared\ComputationResult.cs" />
     <Compile Include="Program.cs" />

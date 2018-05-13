@@ -130,7 +130,8 @@ namespace GPGPU
                                 computationType = ComputationType.GPU,
                                 size = problemsToSolve.First().size,
                                 isSynchronizable = isSyncable,
-                                shortestSynchronizingWordLength = shortestWordLength
+                                shortestSynchronizingWordLength = shortestWordLength,
+                                algorithmName = GetType().Name
                             }
                 ).ToArray()
             ).ToArray();
@@ -154,6 +155,7 @@ namespace GPGPU
                 totalTime = totalTiming.Elapsed
             };
 #endif
+            
             return results;
         }
 
