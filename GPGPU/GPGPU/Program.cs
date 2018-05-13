@@ -38,14 +38,19 @@ namespace GPGPU
             var watch = new Stopwatch();
 
             var version = theSolver.GetType().Namespace;
-            var csvBuilder = new StringBuilder("problemsize,problemcount,SlimGPUAllTOnce,SlimCPU,SlimGPUQueue");
+            var csvBuilder = new StringBuilder("problemsize,problemcount");
+            foreach (var solver in theSolver)
+            {
+                csvBuilder.Append(",").Append(solver.GetType().Name);
+            }
             var resultsDictionary = new List<ComputationResult>();
 
-            var sizeIncrease = 1;
-            var initialProblemSamplingCount = 1 << 18;
+            var sizeIncrease = Math.Sqrt(2);
+            var initialProblemSamplingCount = 1 << 14;
+            var problemCount = 1 << 18;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
-            for (int n = (int)doublePrecisionN; n < (1 << 19); n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            for (int n = (int)doublePrecisionN; n < problemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             //for (int i = 0; i < 10; i++)
             {
                 var localSeed = random.Next();
@@ -59,8 +64,7 @@ namespace GPGPU
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
-
-                    watch.Start();
+                    watch.Restart();
                     var results = solver.Compute(problems, solver.GetBestParallelism());
                     watch.Stop();
                     var summary = new ComputationResultSummary();
