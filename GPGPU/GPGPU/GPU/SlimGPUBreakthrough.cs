@@ -97,6 +97,7 @@ namespace GPGPU
                 streams[stream].Copy(matrixB, gpuB[stream]);
 
                 // TODO: change this entirely
+                // warning, this might not compute the length of a shortest synchronizing word but it will verify the Cerny conjecture
                 //streams[stream].Launch(
                 //    Kernel,
                 //    launchParameters,

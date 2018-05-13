@@ -46,7 +46,7 @@ namespace GPGPU
             var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Sqrt(2);
-            var initialProblemSamplingCount = 1 << 14;
+            var initialProblemSamplingCount = 1 << 17;
             var problemCount = 1 << 18;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
@@ -107,6 +107,9 @@ namespace GPGPU
 
                     //Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, " +
                     //    $"{results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWordLength):F2} average length of a synchronizing word");
+
+                    var lessThanOrEqualTo = 10;
+                    Console.WriteLine($"fraction of less or equal to {lessThanOrEqualTo} is {results.Select(result => result.shortestSynchronizingWordLength <= lessThanOrEqualTo ? 1 : 0).Average()}");
 
                     //#region Histogram
                     //var histogram = results
