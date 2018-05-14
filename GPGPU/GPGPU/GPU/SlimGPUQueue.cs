@@ -29,7 +29,7 @@ namespace GPGPU
             IEnumerable<Problem> problemsToSolve,
             int streamCount,
             Action asyncAction = null,
-            int warpCount = 8)
+            int warpCount = 7)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
@@ -43,7 +43,9 @@ namespace GPGPU
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            var maximumWarps = gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize;
+            // in order to atomically add to a checking array (designed for queue consistency) one int is used by four threads, so in a reeeeaally pessimistic case 255 is the maximum number of threads (everyone go to the same vertex)
+            var maximumWarps = Math.Min(gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize,
+                255 / gpu.Device.Attributes.WarpSize);
             if (warpCount > maximumWarps)
                 warpCount = maximumWarps;
 
@@ -170,9 +172,11 @@ namespace GPGPU
             var power = 1 << n;
 
             #region Pointer setup
+            var byteOffset = 0;
+
             var queueEvenCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                   .Ptr(0);
-            var byteOffset = sizeof(int);
+                   .Ptr(byteOffset / sizeof(int));
+            byteOffset += sizeof(int);
 
             var queueOddCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));

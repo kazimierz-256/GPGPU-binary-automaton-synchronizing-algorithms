@@ -33,6 +33,7 @@ namespace AlgorithmCorrectnessTestProject
                 //new SlimCPUGPU(),
                 //new SlimCPUGPUInbetween(),
                 new SlimGPUAllAtOnce(),
+                //new SlimGPUBreakthrough(),
             };
             foreach (var seed in seeds)
             {

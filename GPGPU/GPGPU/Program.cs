@@ -29,6 +29,7 @@ namespace GPGPU
                 new SlimCPU(),
                 //new SlimCPUGPUInbetween(),
                 new SlimGPUQueue(),
+                new SlimGPUBreakthrough()
             };
             //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
@@ -46,13 +47,15 @@ namespace GPGPU
             var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Sqrt(2);
-            var initialProblemSamplingCount = 1 << 17;
-            var problemCount = 1 << 18;
+            var initialProblemSamplingCount = 1 << 14;
+            var maximalProblemCount = 1 << 18;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
-            for (int n = (int)doublePrecisionN; n < problemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
+            for (int n = (int)doublePrecisionN; n < maximalProblemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             //for (int i = 0; i < 10; i++)
             {
+                csvBuilder.AppendLine();
+                csvBuilder.Append(problemSize).Append(",").Append(n);
                 var localSeed = random.Next();
                 foreach (var solver in theSolver)
                     computeLoopUsing(solver);
@@ -64,15 +67,17 @@ namespace GPGPU
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
+                    solver.Compute(problems, solver.GetBestParallelism());
                     watch.Restart();
                     var results = solver.Compute(problems, solver.GetBestParallelism());
                     watch.Stop();
+                    var computationElapsed = watch.Elapsed;
                     var summary = new ComputationResultSummary();
                     // TODO: fill in summary
                     // TODO: pump summary into csv builder
                     // TODO: export to csv
+                    csvBuilder.Append(",").Append(Math.Round(n / computationElapsed.TotalSeconds));
                     // TODO: create a google docs
-                    var computationElapsed = watch.Elapsed;
                     var benchmarkedResults = results.Where(result => result.benchmarkResult != null && result.benchmarkResult.benchmarkedTime != null && result.benchmarkResult.totalTime != null);
                     var computationToTotalFraction = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
                         / benchmarkedResults.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
