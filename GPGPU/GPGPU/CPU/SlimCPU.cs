@@ -49,10 +49,8 @@ namespace GPGPU
             isDiscovered[initialVertex] = true;
 
             // EXPENSIVE LINE
-            var queue = new ushort[powerSetCount / 2 + 1];
-            var putIndex = 0;
-            var readIndex = 0;
-            queue[(putIndex++) % queue.Length] = (initialVertex);
+            var queue = new Queue<ushort>(n * 5);
+            queue.Enqueue(initialVertex);
             benchmarkTiming.Start();
 
             var discoveredSingleton = false;
@@ -77,12 +75,12 @@ namespace GPGPU
 #if (benchmark)
 
 #endif
-            while (readIndex < putIndex)
+            while (queue.Count > 0)
             {
                 //if (queue.Count > maximumBreadth)
                 //    maximumBreadth = queue.Count;
 
-                consideringVertex = queue[(readIndex++) % queue.Length];
+                consideringVertex = queue.Dequeue();
 
                 if (--verticesUntilBump == 0)
                 {
@@ -116,12 +114,12 @@ namespace GPGPU
                     }
 
                     isDiscovered[vertexAfterTransitionA] = true;
-                    queue[(putIndex++) % queue.Length] = vertexAfterTransitionA;
+                    queue.Enqueue(vertexAfterTransitionA);
 
                     if (seekingFirstNext)
                     {
                         seekingFirstNext = false;
-                        verticesUntilBump = (ushort)(putIndex - readIndex);
+                        verticesUntilBump = (ushort)queue.Count;
                     }
                 }
 
@@ -135,12 +133,12 @@ namespace GPGPU
                     }
 
                     isDiscovered[vertexAfterTransitionB] = true;
-                    queue[(putIndex++) % queue.Length] = vertexAfterTransitionB;
+                    queue.Enqueue(vertexAfterTransitionB);
 
                     if (seekingFirstNext)
                     {
                         seekingFirstNext = false;
-                        verticesUntilBump = (ushort)(putIndex - readIndex);
+                        verticesUntilBump = (ushort)queue.Count;
                     }
                 }
             }
