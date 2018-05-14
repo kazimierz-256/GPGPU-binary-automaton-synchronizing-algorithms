@@ -24,12 +24,12 @@ namespace GPGPU
             //var n = 1 << 18;
             var theSolver = new IComputable[]
             {
-                new SlimGPUAllAtOnce(),
+                //new SlimGPUAllAtOnce(),
                 //new CPU(),
                 new SlimCPU(),
                 //new SlimCPUGPUInbetween(),
-                new SlimGPUQueue(),
-                new SlimGPUBreakthrough()
+                //new SlimGPUQueue(),
+                //new SlimGPUBreakthrough()
             };
             //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion

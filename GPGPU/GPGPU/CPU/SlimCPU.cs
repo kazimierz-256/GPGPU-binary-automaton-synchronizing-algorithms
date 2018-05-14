@@ -49,8 +49,10 @@ namespace GPGPU
             isDiscovered[initialVertex] = true;
 
             // EXPENSIVE LINE
-            var queue = new Queue<ushort>(n * 5);
-            queue.Enqueue(initialVertex);
+            var queue = new ushort[powerSetCount / 2 + 1];
+            var putIndex = 0;
+            var readIndex = 0;
+            queue[(putIndex++) % queue.Length] = (initialVertex);
             benchmarkTiming.Start();
 
             var discoveredSingleton = false;
@@ -75,12 +77,12 @@ namespace GPGPU
 #if (benchmark)
 
 #endif
-            while (queue.Count > 0)
+            while (readIndex < putIndex)
             {
                 //if (queue.Count > maximumBreadth)
                 //    maximumBreadth = queue.Count;
 
-                consideringVertex = queue.Dequeue();
+                consideringVertex = queue[(readIndex++) % queue.Length];
 
                 if (--verticesUntilBump == 0)
                 {
@@ -114,12 +116,12 @@ namespace GPGPU
                     }
 
                     isDiscovered[vertexAfterTransitionA] = true;
-                    queue.Enqueue(vertexAfterTransitionA);
+                    queue[(putIndex++) % queue.Length] = vertexAfterTransitionA;
 
                     if (seekingFirstNext)
                     {
                         seekingFirstNext = false;
-                        verticesUntilBump = (ushort)queue.Count;
+                        verticesUntilBump = (ushort)(putIndex - readIndex);
                     }
                 }
 
@@ -133,12 +135,12 @@ namespace GPGPU
                     }
 
                     isDiscovered[vertexAfterTransitionB] = true;
-                    queue.Enqueue(vertexAfterTransitionB);
+                    queue[(putIndex++) % queue.Length] = vertexAfterTransitionB;
 
                     if (seekingFirstNext)
                     {
                         seekingFirstNext = false;
-                        verticesUntilBump = (ushort)queue.Count;
+                        verticesUntilBump = (ushort)(putIndex - readIndex);
                     }
                 }
             }
