@@ -10,14 +10,14 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputable GetLatestComputingUnit() => new SlimGPULeastSynchronizable();
+        private IComputable GetLatestComputingUnit() => new SlimCPU();
 
         [TestMethod]
-        public void YoutubeExperimentalMathematicsSize3()
+        public void SmallWorstCase()
         {
             var problem = Problem.GenerateWorstCase(3);
 
-            var result = GetLatestComputingUnit().ComputeOne(problem);
+            var result = GetLatestComputingUnit().Compute(new[] { problem }, 0, 1, GetLatestComputingUnit().GetBestParallelism())[0];
 
             Assert.IsNotNull(result);
             Assert.IsTrue(result.isSynchronizable);
@@ -26,12 +26,12 @@ namespace AlgorithmCorrectnessTestProject
             Assert.AreEqual(4, result.shortestSynchronizingWordLength);
         }
         [TestMethod]
-        public void YoutubeExperimentalMathematicsSizeLarge()
+        public void LargeWorstCase()
         {
             var n = 13;
             var problem = Problem.GenerateWorstCase(n);
 
-            var result = GetLatestComputingUnit().ComputeOne(problem);
+            var result = GetLatestComputingUnit().Compute(new[] { problem }, 0, 1, GetLatestComputingUnit().GetBestParallelism())[0];
 
             Assert.IsNotNull(result);
             Assert.IsTrue(result.isSynchronizable);

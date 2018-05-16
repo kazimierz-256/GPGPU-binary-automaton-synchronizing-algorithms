@@ -10,10 +10,10 @@ namespace GPGPU
 {
     public class SlimCPUGPUInbetween : IComputable
     {
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
             => Compute(problemsToSolve, degreeOfParallelism, .1f);
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism, float cpuPart)
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism, float cpuPart)
         {
             IEnumerable<ComputationResult> cpuResults = null;
             int cpuProblems = (int)Math.Floor(problemsToSolve.Count() * cpuPart);

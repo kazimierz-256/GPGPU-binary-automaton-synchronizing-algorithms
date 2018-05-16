@@ -15,21 +15,28 @@ namespace GPGPU
 {
     public class SlimGPUQueue : IComputable
     {
+
+        public int GetBestParallelism() => 16;
+
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
         public ComputationResult ComputeOne(Problem problemToSolve)
-        => Compute(new[] { problemToSolve }, 1).First();
+        => Compute(new[] { problemToSolve }, 0, 1, 1).First();
 
         public ComputationResult[] Compute(
-            IEnumerable<Problem> problemsToSolve,
+            Problem[] problemsToSolve,
+            int beginningIndex,
+            int problemCount,
             int streamCount)
-            => Compute(problemsToSolve, streamCount, null);
+            => Compute(problemsToSolve, beginningIndex, problemCount, streamCount, null);
 
         public ComputationResult[] Compute(
-            IEnumerable<Problem> problemsToSolve,
+            Problem[] problemsToSolve,
+            int beginningIndex,
+            int problemCount,
             int streamCount,
             Action asyncAction = null,
-            int warpCount = 7)
+            int warpCount = 1)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
@@ -38,7 +45,7 @@ namespace GPGPU
             var benchmarkTiming = new Stopwatch();
 #endif
             var gpu = Gpu.Default;
-            var n = problemsToSolve.First().size;
+            var n = problemsToSolve[beginningIndex].size;
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
@@ -49,9 +56,9 @@ namespace GPGPU
             if (warpCount > maximumWarps)
                 warpCount = maximumWarps;
 
-            var problemsPerStream = (problemsToSolve.Count() + streamCount - 1) / streamCount;
+            var problemsPerStream = (problemCount + streamCount - 1) / streamCount;
             var problemsPartitioned = Enumerable.Range(0, streamCount)
-                .Select(i => problemsToSolve.Skip(problemsPerStream * i)
+                .Select(i => problemsToSolve.Skip(beginningIndex + problemsPerStream * i)
                     .Take(problemsPerStream)
                     .ToArray())
                 .Where(partition => partition.Length > 0)
@@ -131,7 +138,7 @@ namespace GPGPU
                             => new ComputationResult()
                             {
                                 computationType = ComputationType.GPU,
-                                size = problemsToSolve.First().size,
+                                size = problemsToSolve[beginningIndex].size,
                                 isSynchronizable = isSyncable,
                                 shortestSynchronizingWordLength = shortestWordLength,
                                 algorithmName = GetType().Name
@@ -167,6 +174,9 @@ namespace GPGPU
             bool[] isSynchronizing,
             int[] shortestSynchronizingWordLength)
         {
+            const int skipEvery = 1;
+            if (threadIdx.x % skipEvery != 0)
+                return;
             var n = problemSize.Value;
             var arrayCount = precomputedStateTransitioningMatrixA.Length / n;
             var power = 1 << n;
@@ -227,9 +237,9 @@ namespace GPGPU
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                for (int consideringVertex = threadIdx.x, endingVertex = (power - 1) >> 2;
+                for (int consideringVertex = threadIdx.x / skipEvery, endingVertex = (power - 1) >> 2;
                     consideringVertex < endingVertex;
-                    consideringVertex += blockDim.x)
+                    consideringVertex += (blockDim.x / skipEvery))
                     isDiscoveredPtr[consideringVertex] = 0;
 
                 if (threadIdx.x == 0)
@@ -240,13 +250,12 @@ namespace GPGPU
                     queueOdd[0] = (ushort)(power - 1);
                     // assuming n >= 2
                     isDiscoveredPtr[(power - 1) >> 2] = 1 << 24;
-                }
-                if (threadIdx.x == DeviceFunction.WarpSize || (threadIdx.x == 0 && blockDim.x <= DeviceFunction.WarpSize))
                     for (int i = 0; i < n; i++)
                     {
                         gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
                         gpuB[i] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + i]);
                     }
+                }
                 var readingQueue = queueOdd;
                 var writingQueue = queueEven;
                 var readingQueueCount = queueOddCount;
@@ -258,8 +267,8 @@ namespace GPGPU
 
                 while (readingQueueCountCached > 0 && !shouldStop[0])
                 {
-                    int myPart = (readingQueueCountCached + blockDim.x - 1) / blockDim.x;
-                    int beginningPointer = threadIdx.x * myPart;
+                    int myPart = (readingQueueCountCached + blockDim.x / skipEvery - 1) / (blockDim.x / skipEvery);
+                    int beginningPointer = threadIdx.x / skipEvery * myPart;
                     int endingPointer = beginningPointer + myPart;
                     if (readingQueueCountCached < endingPointer)
                         endingPointer = readingQueueCountCached;
@@ -338,6 +347,5 @@ namespace GPGPU
                 }
             }
         }
-        public int GetBestParallelism() => 16;
     }
 }

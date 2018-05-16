@@ -21,12 +21,12 @@ namespace GPGPU
         => Compute(new[] { problemToSolve }, 1).First();
 
         public ComputationResult[] Compute(
-            IEnumerable<Problem> problemsToSolve,
+            Problem[] problemsToSolve,
             int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
         public ComputationResult[] Compute(
-            IEnumerable<Problem> problemsToSolve,
+            Problem[] problemsToSolve,
             int streamCount,
             Action asyncAction = null,
             int warpCount = 16)
@@ -153,7 +153,7 @@ namespace GPGPU
                 }
             }
 
-            var cpuResults = slimCPU.Compute(listOfCPUProblems, slimCPU.GetBestParallelism());
+            var cpuResults = slimCPU.Compute(listOfCPUProblems.ToArray(), slimCPU.GetBestParallelism());
 
             for (int i = 0; i < listOfCPUProblems.Count; i++)
             {

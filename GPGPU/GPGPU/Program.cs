@@ -30,7 +30,7 @@ namespace GPGPU
                 //new SlimCPUGPUInbetween(),
                 new SlimGPUQueue(),
                 //new SlimGPUBreakthrough(),
-                new SlimGPULeastSynchronizable()
+                //new SlimGPULeastSynchronizable()
             };
             //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
@@ -68,9 +68,9 @@ namespace GPGPU
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
-                    solver.Compute(problems, solver.GetBestParallelism());
+                    solver.Compute(problems, 0, problems.Length, solver.GetBestParallelism());
                     watch.Restart();
-                    var results = solver.Compute(problems, solver.GetBestParallelism());
+                    var results = solver.Compute(problems, 0, problems.Length, solver.GetBestParallelism());
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
                     var summary = new ComputationResultSummary();

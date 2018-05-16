@@ -9,8 +9,7 @@ namespace GPGPU.Interfaces
 {
     public interface IComputable
     {
-        ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism);
-        ComputationResult ComputeOne(Problem problemToSolve);
+        ComputationResult[] Compute(Problem[] problemsToSolve, int beginningIndex, int problemCount, int degreeOfParallelism);
         int GetBestParallelism();
     }
 }

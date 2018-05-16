@@ -12,175 +12,194 @@ namespace GPGPU
 {
     public class SlimCPU : IComputable
     {
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
+        public int GetBestParallelism() => 2;
+
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int beginningIndex, int problemCount, int degreeOfParallelism)
         {
+            if (degreeOfParallelism > problemCount)
+            {
+                degreeOfParallelism = problemCount;
+            }
             if (degreeOfParallelism == 1)
             {
-                return problemsToSolve
-                    .Select(problem => ComputeOne(problem))
-                    .ToArray();
+                return ComputeMany(problemsToSolve, beginningIndex, problemCount);
             }
             else
             {
-                return problemsToSolve
-                    .AsParallel()
-                    .AsOrdered()
-                    .WithDegreeOfParallelism(degreeOfParallelism)
-                    .Select(problem => ComputeOne(problem))
-                    .ToArray();
+                var results = new ComputationResult[problemCount];
+                var partition = (problemCount + degreeOfParallelism - 1) / degreeOfParallelism;
+                Parallel.For(0, degreeOfParallelism, i =>
+                {
+                    var miniResults = ComputeMany(problemsToSolve, i * partition, Math.Min(partition, problemCount - i * partition));
+                    Array.ConstrainedCopy(miniResults, 0, results, i * partition, miniResults.Length);
+                });
+                return results;
             }
         }
 
-        public ComputationResult ComputeOne(Problem problemToSolve)
+        private ComputationResult[] ComputeMany(Problem[] problemsToSolve, int beginningIndex, int problemCount)
         {
+            var results = new ComputationResult[problemCount];
 #if (benchmark)
             var totalTiming = new Stopwatch();
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
 #endif
 
-            var n = problemToSolve.size;
+            var n = problemsToSolve[beginningIndex].size;
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
             // EXPENSIVE LINE
-            var isDiscovered = new bool[powerSetCount];
-            isDiscovered[initialVertex] = true;
+            byte localProblemId = 1;
+            var isDiscovered = new byte[powerSetCount];
+            isDiscovered[initialVertex] = localProblemId;
 
             // EXPENSIVE LINE
             var queue = new Queue<ushort>(n * 5);
-            queue.Enqueue(initialVertex);
-            benchmarkTiming.Start();
-
-            var discoveredSingleton = false;
-            ushort consideringVertex;
-            ushort vertexAfterTransitionA;
-            ushort vertexAfterTransitionB;
-            ushort firstSingletonDistance = 0;
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
-
-            for (int i = 0; i < n; i++)
+            for (int problem = beginningIndex, endingIndex = beginningIndex + problemCount; problem < endingIndex; problem++, localProblemId++)
             {
-                precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixA[i]);
-                precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemToSolve.stateTransitioningMatrixB[i]);
-            }
+                queue.Clear();
+                queue.Enqueue(initialVertex);
+                benchmarkTiming.Start();
 
-            //var maximumBreadth = 0;
-            ushort currentNextDistance = 1;
-            var verticesUntilBump = ushort.MaxValue;
-            var seekingFirstNext = true;
+                var discoveredSingleton = false;
+                ushort consideringVertex;
+                ushort vertexAfterTransitionA;
+                ushort vertexAfterTransitionB;
+                ushort firstSingletonDistance = 0;
+
+                if (localProblemId == 0)
+                {
+                    for (int i = 0; i < powerSetCount; i++)
+                    {
+                        isDiscovered[i] = 0;
+                    }
+                    localProblemId = 1;
+                }
+
+                for (int i = 0; i < n; i++)
+                {
+                    precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixA[i]);
+                    precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixB[i]);
+                }
+
+                //var maximumBreadth = 0;
+                ushort currentNextDistance = 1;
+                var verticesUntilBump = ushort.MaxValue;
+                var seekingFirstNext = true;
 #if (benchmark)
 
 #endif
-            while (queue.Count > 0)
-            {
-                //if (queue.Count > maximumBreadth)
-                //    maximumBreadth = queue.Count;
-
-                consideringVertex = queue.Dequeue();
-
-                if (--verticesUntilBump == 0)
+                while (queue.Count > 0)
                 {
-                    ++currentNextDistance;
-                    seekingFirstNext = true;
-                }
+                    //if (queue.Count > maximumBreadth)
+                    //    maximumBreadth = queue.Count;
 
-                vertexAfterTransitionA = vertexAfterTransitionB = 0;
+                    consideringVertex = queue.Dequeue();
 
-                // check for singleton existance
-                // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
-                // note: consideringVertex cannot ever be equal to 0
-
-                // watch out for the index range in the for loop
-                for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
-                {
-                    if (0 != (mask & consideringVertex))
+                    if (--verticesUntilBump == 0)
                     {
-                        vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
-                        vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
+                        ++currentNextDistance;
+                        seekingFirstNext = true;
+                    }
+
+                    vertexAfterTransitionA = vertexAfterTransitionB = 0;
+
+                    // check for singleton existance
+                    // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
+                    // note: consideringVertex cannot ever be equal to 0
+
+                    // watch out for the index range in the for loop
+                    for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
+                    {
+                        if (0 != (mask & consideringVertex))
+                        {
+                            vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
+                            vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
+                        }
+                    }
+
+                    if (localProblemId != isDiscovered[vertexAfterTransitionA])
+                    {
+                        if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
+                        {
+                            discoveredSingleton = true;
+                            firstSingletonDistance = currentNextDistance;
+                            break;
+                        }
+
+                        isDiscovered[vertexAfterTransitionA] = localProblemId;
+                        queue.Enqueue(vertexAfterTransitionA);
+
+                        if (seekingFirstNext)
+                        {
+                            seekingFirstNext = false;
+                            verticesUntilBump = (ushort)queue.Count;
+                        }
+                    }
+
+                    if (localProblemId != isDiscovered[vertexAfterTransitionB])
+                    {
+                        if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
+                        {
+                            discoveredSingleton = true;
+                            firstSingletonDistance = currentNextDistance;
+                            break;
+                        }
+
+                        isDiscovered[vertexAfterTransitionB] = localProblemId;
+                        queue.Enqueue(vertexAfterTransitionB);
+
+                        if (seekingFirstNext)
+                        {
+                            seekingFirstNext = false;
+                            verticesUntilBump = (ushort)queue.Count;
+                        }
                     }
                 }
-
-                if (!isDiscovered[vertexAfterTransitionA])
-                {
-                    if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
-                    {
-                        discoveredSingleton = true;
-                        firstSingletonDistance = currentNextDistance;
-                        break;
-                    }
-
-                    isDiscovered[vertexAfterTransitionA] = true;
-                    queue.Enqueue(vertexAfterTransitionA);
-
-                    if (seekingFirstNext)
-                    {
-                        seekingFirstNext = false;
-                        verticesUntilBump = (ushort)queue.Count;
-                    }
-                }
-
-                if (!isDiscovered[vertexAfterTransitionB])
-                {
-                    if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
-                    {
-                        discoveredSingleton = true;
-                        firstSingletonDistance = currentNextDistance;
-                        break;
-                    }
-
-                    isDiscovered[vertexAfterTransitionB] = true;
-                    queue.Enqueue(vertexAfterTransitionB);
-
-                    if (seekingFirstNext)
-                    {
-                        seekingFirstNext = false;
-                        verticesUntilBump = (ushort)queue.Count;
-                    }
-                }
-            }
 #if (benchmark)
 
-            benchmarkTiming.Stop();
+                benchmarkTiming.Stop();
 #endif
 
-            // finished main loop
+                // finished main loop
 
-            var result = new ComputationResult()
-            {
-                benchmarkResult = new BenchmarkResult(),
-                computationType = ComputationType.CPU_Serial,
-                //queueBreadth = maximumBreadth,
-                size = n,
-                algorithmName = GetType().Name
-                //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
-            };
+                results[problem - beginningIndex] = new ComputationResult()
+                {
+                    benchmarkResult = new BenchmarkResult(),
+                    computationType = ComputationType.CPU_Serial,
+                    //queueBreadth = maximumBreadth,
+                    size = n,
+                    algorithmName = GetType().Name
+                    //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
+                };
 
-            if (discoveredSingleton)
-            {
-                result.isSynchronizable = true;
-                // watch out for off by one error!
-                if (firstSingletonDistance > maximumPermissibleWordLength)
-                    throw new Exception("Cerny conjecture is false");
+                if (discoveredSingleton)
+                {
+                    results[problem - beginningIndex].isSynchronizable = true;
+                    results[problem - beginningIndex].shortestSynchronizingWordLength = firstSingletonDistance;
+                    // watch out for off by one error!
+                    if (firstSingletonDistance > maximumPermissibleWordLength)
+                        throw new Exception("Cerny conjecture is false");
+                }
+                else
+                {
+                    // not a synchronizing automata
+                    // hmm.. is this correctly computed?
+                    results[problem - beginningIndex].isSynchronizable = false;
+                }
+
             }
-            else
-            {
-                // not a synchronizing automata
-                // hmm.. is this correctly computed?
-                result.isSynchronizable = false;
-            }
-
-            result.shortestSynchronizingWordLength = firstSingletonDistance;
 #if (benchmark)
-            result.benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
-            result.benchmarkResult.totalTime = totalTiming.Elapsed;
+            results[0].benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
+            results[0].benchmarkResult.totalTime = totalTiming.Elapsed;
 #endif
-            return result;
+            return results;
         }
-
-        public int GetBestParallelism() => 2;
     }
 }

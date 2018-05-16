@@ -16,7 +16,7 @@ namespace GPGPU
         private ushort[] previousVertexStatic = new ushort[mostProbablePowerSetCount];
         private bool[] previousLetterUsedEqualsBStatic = new bool[mostProbablePowerSetCount];
 
-        public ComputationResult[] Compute(IEnumerable<Problem> problemsToSolve, int degreeOfParallelism)
+        public ComputationResult[] Compute(Problem[] problemsToSolve, int degreeOfParallelism)
         {
             if (degreeOfParallelism == 1)
             {

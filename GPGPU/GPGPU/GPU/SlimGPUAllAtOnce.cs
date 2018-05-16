@@ -21,12 +21,12 @@ namespace GPGPU
         => Compute(new[] { problemToSolve }, 1).First();
 
         public ComputationResult[] Compute(
-            IEnumerable<Problem> problemsToSolve,
+            Problem[] problemsToSolve,
             int streamCount)
             => Compute(problemsToSolve, streamCount, null);
 
         public ComputationResult[] Compute(
-            IEnumerable<Problem> problemsToSolve,
+            Problem[] problemsToSolve,
             int streamCount,
             Action asyncAction = null,
             int warpCount = 8)
