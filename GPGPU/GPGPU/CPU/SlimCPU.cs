@@ -51,22 +51,30 @@ namespace GPGPU
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            // EXPENSIVE LINE
             byte localProblemId = 1;
             var isDiscovered = new byte[powerSetCount];
             isDiscovered[initialVertex] = localProblemId;
 
-            // EXPENSIVE LINE
-            // theoretical maximum breadth is power/2+1
             var queue = new Queue<ushort>(n * 2);
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
             for (int problem = beginningIndex, endingIndex = beginningIndex + problemCount; problem < endingIndex; problem++, localProblemId++)
             {
+#if (benchmark)
+                benchmarkTiming.Start();
+#endif
                 queue.Clear();
                 queue.Enqueue(initialVertex);
-                benchmarkTiming.Start();
+                if (localProblemId == 0)
+                {
+                    localProblemId = 1;
+                    for (int i = 0; i < powerSetCount; i++)
+                    {
+                        isDiscovered[i] = 0;
+                    }
+                }
+                isDiscovered[initialVertex] = localProblemId;
 
                 var discoveredSingleton = false;
                 ushort consideringVertex;
@@ -74,14 +82,6 @@ namespace GPGPU
                 ushort vertexAfterTransitionB;
                 ushort firstSingletonDistance = 0;
 
-                if (localProblemId == 0)
-                {
-                    for (int i = 0; i < powerSetCount; i++)
-                    {
-                        isDiscovered[i] = 0;
-                    }
-                    localProblemId = 1;
-                }
 
                 for (int i = 0; i < n; i++)
                 {
@@ -93,9 +93,7 @@ namespace GPGPU
                 ushort currentNextDistance = 1;
                 var verticesUntilBump = ushort.MaxValue;
                 var seekingFirstNext = true;
-#if (benchmark)
 
-#endif
                 while (queue.Count > 0)
                 {
                     //if (queue.Count > maximumBreadth)

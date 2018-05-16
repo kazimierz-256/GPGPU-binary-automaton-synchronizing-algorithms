@@ -52,7 +52,7 @@ namespace AlgorithmCorrectnessTestProject
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
             var sizes = Enumerable.Range(13, 1).ToArray();
-            var seeds = Enumerable.Range(123456, 4).ToArray();
+            var seeds = Enumerable.Range(12456, 4).ToArray();
             //var invariantProblems = new List<Problem>()
             //{
             //    Problem.GenerateWorstCase(3),
