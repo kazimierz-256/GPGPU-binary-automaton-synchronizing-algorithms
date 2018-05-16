@@ -12,7 +12,7 @@ namespace GPGPU
 {
     public class SlimCPU : IComputable
     {
-        public int GetBestParallelism() => 2;
+        public int GetBestParallelism() => Environment.ProcessorCount;
 
         public ComputationResult[] Compute(Problem[] problemsToSolve, int beginningIndex, int problemCount, int degreeOfParallelism)
         {
@@ -57,7 +57,8 @@ namespace GPGPU
             isDiscovered[initialVertex] = localProblemId;
 
             // EXPENSIVE LINE
-            var queue = new Queue<ushort>(n * 5);
+            // theoretical maximum breadth is power/2+1
+            var queue = new Queue<ushort>(n * 2);
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
