@@ -28,8 +28,9 @@ namespace GPGPU
                 //new CPU(),
                 new SlimCPU(),
                 //new SlimCPUGPUInbetween(),
-                //new SlimGPUQueue(),
-                //new SlimGPUBreakthrough()
+                new SlimGPUQueue(),
+                //new SlimGPUBreakthrough(),
+                new SlimGPULeastSynchronizable()
             };
             //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion

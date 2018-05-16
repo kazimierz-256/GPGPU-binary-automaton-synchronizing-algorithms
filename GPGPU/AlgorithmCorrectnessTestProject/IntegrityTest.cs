@@ -18,12 +18,12 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void CheckIntegrity()
         {
-            var n = 1 << 15;
+            var n = 1 << 1;
             // there are issues with multiple sized problems!
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
             var sizes = Enumerable.Range(13, 1).ToArray();
-            var seeds = Enumerable.Range(123456, 1).ToArray();
+            var seeds = Enumerable.Range(123456, 100).ToArray();
 
             var computables = new IComputable[] {
                 new CPU(),
@@ -34,6 +34,7 @@ namespace AlgorithmCorrectnessTestProject
                 //new SlimCPUGPUInbetween(),
                 new SlimGPUAllAtOnce(),
                 //new SlimGPUBreakthrough(),
+                new SlimGPULeastSynchronizable(),
             };
             foreach (var seed in seeds)
             {

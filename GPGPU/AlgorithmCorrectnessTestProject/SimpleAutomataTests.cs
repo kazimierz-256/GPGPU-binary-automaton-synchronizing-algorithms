@@ -10,7 +10,7 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputable GetLatestComputingUnit() => new SlimGPUQueue();
+        private IComputable GetLatestComputingUnit() => new SlimGPULeastSynchronizable();
 
         [TestMethod]
         public void YoutubeExperimentalMathematicsSize3()
