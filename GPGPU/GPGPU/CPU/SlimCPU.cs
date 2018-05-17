@@ -173,23 +173,16 @@ namespace GPGPU
                     computationType = ComputationType.CPU_Parallel,
                     //queueBreadth = maximumBreadth,
                     size = n,
-                    algorithmName = GetType().Name
+                    algorithmName = GetType().Name,
+                    isSynchronizable = discoveredSingleton
                     //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
                 };
 
                 if (discoveredSingleton)
                 {
-                    results[problem - beginningIndex].isSynchronizable = true;
                     results[problem - beginningIndex].shortestSynchronizingWordLength = currentNextDistance;
-                    // watch out for off by one error!
                     if (currentNextDistance > maximumPermissibleWordLength)
                         throw new Exception("Cerny conjecture is false");
-                }
-                else
-                {
-                    // not a synchronizing automata
-                    // hmm.. is this correctly computed?
-                    results[problem - beginningIndex].isSynchronizable = false;
                 }
 
             }
