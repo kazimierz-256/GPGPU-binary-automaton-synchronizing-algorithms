@@ -36,7 +36,7 @@ namespace GPGPU
             int problemCount,
             int streamCount,
             Action asyncAction = null,
-            int warpCount = 8)
+            int warpCount = 7)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
