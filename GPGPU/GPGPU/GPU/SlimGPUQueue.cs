@@ -99,6 +99,9 @@ namespace GPGPU
                 streams[stream].Copy(matrixA, gpuAs[stream]);
                 streams[stream].Copy(matrixB, gpuBs[stream]);
 
+                gpuResultsIsSynchronizable[stream] = new bool[localProblemsCount];
+                gpuResultsShortestSynchronizingWordLength[stream] = new int[localProblemsCount];
+
                 streams[stream].Launch(
                     Kernel,
                     launchParameters,
@@ -111,19 +114,22 @@ namespace GPGPU
 
             asyncAction?.Invoke();
 
-            for (int stream = 0; stream < streamCount; stream++)
+            var streamId = 0;
+            foreach (var stream in streams)
             {
-                var offset = stream * problemsPerStream;
+                var offset = streamId * problemsPerStream;
                 var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
-                streams[stream].Synchronize();
+                stream.Synchronize();
 #if (benchmark)
                 benchmarkTiming.Stop();
 #endif
-                streams[stream].Copy(isSynchronizable[stream], gpuResultsIsSynchronizable[stream]);
-                streams[stream].Copy(shortestSynchronizingWordLength[stream], gpuResultsShortestSynchronizingWordLength[stream]);
+                stream.Copy(isSynchronizable[streamId], gpuResultsIsSynchronizable[streamId]);
+                stream.Copy(shortestSynchronizingWordLength[streamId], gpuResultsShortestSynchronizingWordLength[streamId]);
+
+                streamId++;
             }
 
             gpu.Synchronize();
