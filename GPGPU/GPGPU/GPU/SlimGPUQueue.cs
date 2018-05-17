@@ -55,22 +55,12 @@ namespace GPGPU
                 255 / gpu.Device.Attributes.WarpSize);
             if (warpCount > maximumWarps)
                 warpCount = maximumWarps;
-
+            if (problemCount < streamCount)
+                streamCount = problemCount;
             var problemsPerStream = (problemCount + streamCount - 1) / streamCount;
-            var problemsPartitioned = Enumerable.Range(0, streamCount)
-                .Select(i => problemsToSolve.Skip(beginningIndex + problemsPerStream * i)
-                    .Take(problemsPerStream)
-                    .ToArray())
-                .Where(partition => partition.Length > 0)
-                .ToArray();
-            streamCount = problemsPartitioned.Length;
             var streams = Enumerable.Range(0, streamCount)
                 .Select(_ => gpu.CreateStream()).ToArray();
 
-            var gpuA = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
-            var gpuB = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length * n)).ToArray();
-            var shortestSynchronizingWordLength = problemsPartitioned.Select(problems => gpu.Allocate<int>(problems.Length)).ToArray();
-            var isSynchronizable = problemsPartitioned.Select(problems => gpu.Allocate<bool>(problems.Length)).ToArray();
             gpu.Copy(n, problemSize);
 
             var launchParameters = new LaunchParam(
@@ -82,34 +72,38 @@ namespace GPGPU
                 + 2 * n * sizeof(ushort)
                 + sizeof(bool)
             );
-            var gpuResultsIsSynchronizable = problemsPartitioned
-                .Select(problems => new bool[problems.Length])
-                .ToArray();
-            var gpuResultsShortestSynchronizingWordLength = problemsPartitioned
-                .Select(problems => new int[problems.Length])
-                .ToArray();
-
+            var gpuResultsIsSynchronizable = new bool[streamCount][];
+            var gpuResultsShortestSynchronizingWordLength = new int[streamCount][];
+            var gpuAs = new int[streamCount][];
+            var gpuBs = new int[streamCount][];
+            var shortestSynchronizingWordLength = new int[streamCount][];
+            var isSynchronizable = new bool[streamCount][];
 
             for (int stream = 0; stream < streamCount; stream++)
             {
-                var problems = problemsPartitioned[stream];
+                var offset = stream * problemsPerStream;
+                var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
+                gpuAs[stream] = gpu.Allocate<int>(localProblemsCount * n);
+                gpuBs[stream] = gpu.Allocate<int>(localProblemsCount * n);
+                shortestSynchronizingWordLength[stream] = gpu.Allocate<int>(localProblemsCount);
+                isSynchronizable[stream] = gpu.Allocate<bool>(localProblemsCount);
 
-                var matrixA = new int[problems.Length * n];
-                var matrixB = new int[problems.Length * n];
-                Parallel.For(0, problems.Length, problem =>
+                var matrixA = new int[localProblemsCount * n];
+                var matrixB = new int[localProblemsCount * n];
+                Parallel.For(0, localProblemsCount, problem =>
                 {
-                    Array.ConstrainedCopy(problems[problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
-                    Array.ConstrainedCopy(problems[problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
+                    Array.ConstrainedCopy(problemsToSolve[offset + problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
+                    Array.ConstrainedCopy(problemsToSolve[offset + problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
                 });
 
-                streams[stream].Copy(matrixA, gpuA[stream]);
-                streams[stream].Copy(matrixB, gpuB[stream]);
+                streams[stream].Copy(matrixA, gpuAs[stream]);
+                streams[stream].Copy(matrixB, gpuBs[stream]);
 
                 streams[stream].Launch(
                     Kernel,
                     launchParameters,
-                    gpuA[stream],
-                    gpuB[stream],
+                    gpuAs[stream],
+                    gpuBs[stream],
                     isSynchronizable[stream],
                     shortestSynchronizingWordLength[stream]
                     );
@@ -119,6 +113,8 @@ namespace GPGPU
 
             for (int stream = 0; stream < streamCount; stream++)
             {
+                var offset = stream * problemsPerStream;
+                var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
@@ -146,11 +142,9 @@ namespace GPGPU
                 ).ToArray()
             ).ToArray();
 
-            foreach (var array in gpuA.AsEnumerable<Array>()
-                .Concat(gpuB)
-                .Concat(shortestSynchronizingWordLength)
-                .Concat(isSynchronizable))
-                Gpu.Free(array);
+            foreach (var arrays in new IEnumerable<Array>[] { gpuAs, gpuBs, isSynchronizable, shortestSynchronizingWordLength })
+                foreach (var array in arrays)
+                    Gpu.Free(array);
 
             foreach (var stream in streams)
                 stream.Dispose();
