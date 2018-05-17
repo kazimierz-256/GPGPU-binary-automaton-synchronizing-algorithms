@@ -93,8 +93,8 @@ namespace GPGPU
                 var matrixB = new int[localProblemsCount * n];
                 Parallel.For(0, localProblemsCount, problem =>
                 {
-                    Array.ConstrainedCopy(problemsToSolve[offset + problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
-                    Array.ConstrainedCopy(problemsToSolve[offset + problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
+                    Array.ConstrainedCopy(problemsToSolve[beginningIndex + offset + problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
+                    Array.ConstrainedCopy(problemsToSolve[beginningIndex + offset + problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
                 });
 
                 streams[stream].Copy(matrixA, gpuAs[stream]);

@@ -32,10 +32,10 @@ namespace GPGPU
                 {
                     var miniResults = ComputeMany(
                         problemsToSolve,
-                        i * partition,
+                        beginningIndex + i * partition,
                         Math.Min(partition, problemCount - i * partition)
                         );
-                    Array.ConstrainedCopy(miniResults, 0, results, i * partition, miniResults.Length);
+                    Array.ConstrainedCopy(miniResults, 0, results, beginningIndex + i * partition, miniResults.Length);
                 });
                 return results;
             }
@@ -57,7 +57,6 @@ namespace GPGPU
 
             byte localProblemId = 1;
             var isDiscovered = new byte[powerSetCount];
-            isDiscovered[initialVertex] = localProblemId;
 
             var queue = new Queue<ushort>(n * 2);
 
@@ -68,21 +67,21 @@ namespace GPGPU
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
-                queue.Clear();
-                queue.Enqueue(initialVertex);
                 if (localProblemId == 0)
                 {
                     localProblemId = 1;
-                    // should be faster than zeroing out an array
-                    isDiscovered = new byte[powerSetCount];
+                    Array.Clear(isDiscovered, 0, isDiscovered.Length);
+                    //// should be faster than zeroing out an array
+                    //isDiscovered = new byte[powerSetCount];
                 }
                 isDiscovered[initialVertex] = localProblemId;
+                queue.Clear();
+                queue.Enqueue(initialVertex);
 
                 var discoveredSingleton = false;
                 ushort consideringVertex;
                 ushort vertexAfterTransitionA;
                 ushort vertexAfterTransitionB;
-                ushort firstSingletonDistance = 0;
 
 
                 for (int i = 0; i < n; i++)
@@ -130,7 +129,6 @@ namespace GPGPU
                         if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
                         {
                             discoveredSingleton = true;
-                            firstSingletonDistance = currentNextDistance;
                             break;
                         }
 
@@ -149,7 +147,6 @@ namespace GPGPU
                         if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
                         {
                             discoveredSingleton = true;
-                            firstSingletonDistance = currentNextDistance;
                             break;
                         }
 
@@ -173,7 +170,7 @@ namespace GPGPU
                 results[problem - beginningIndex] = new ComputationResult()
                 {
                     benchmarkResult = new BenchmarkResult(),
-                    computationType = ComputationType.CPU_Serial,
+                    computationType = ComputationType.CPU_Parallel,
                     //queueBreadth = maximumBreadth,
                     size = n,
                     algorithmName = GetType().Name
@@ -183,9 +180,9 @@ namespace GPGPU
                 if (discoveredSingleton)
                 {
                     results[problem - beginningIndex].isSynchronizable = true;
-                    results[problem - beginningIndex].shortestSynchronizingWordLength = firstSingletonDistance;
+                    results[problem - beginningIndex].shortestSynchronizingWordLength = currentNextDistance;
                     // watch out for off by one error!
-                    if (firstSingletonDistance > maximumPermissibleWordLength)
+                    if (currentNextDistance > maximumPermissibleWordLength)
                         throw new Exception("Cerny conjecture is false");
                 }
                 else
