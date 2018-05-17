@@ -118,8 +118,6 @@ namespace GPGPU
             var streamId = 0;
             foreach (var stream in streams)
             {
-                var offset = streamId * problemsPerStream;
-                var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif

@@ -30,7 +30,11 @@ namespace GPGPU
                 var partition = (problemCount + degreeOfParallelism - 1) / degreeOfParallelism;
                 Parallel.For(0, degreeOfParallelism, i =>
                 {
-                    var miniResults = ComputeMany(problemsToSolve, i * partition, Math.Min(partition, problemCount - i * partition));
+                    var miniResults = ComputeMany(
+                        problemsToSolve,
+                        i * partition,
+                        Math.Min(partition, problemCount - i * partition)
+                        );
                     Array.ConstrainedCopy(miniResults, 0, results, i * partition, miniResults.Length);
                 });
                 return results;
@@ -69,10 +73,8 @@ namespace GPGPU
                 if (localProblemId == 0)
                 {
                     localProblemId = 1;
-                    for (int i = 0; i < powerSetCount; i++)
-                    {
-                        isDiscovered[i] = 0;
-                    }
+                    // should be faster than zeroing out an array
+                    isDiscovered = new byte[powerSetCount];
                 }
                 isDiscovered[initialVertex] = localProblemId;
 
