@@ -47,7 +47,7 @@ namespace GPGPU
             }
             var resultsDictionary = new List<ComputationResult>();
 
-            var sizeIncrease = Math.Sqrt(2);
+            var sizeIncrease = Math.Sqrt(Math.Sqrt(2));
             var initialProblemSamplingCount = 1 << 14;
             var maximalProblemCount = 1 << 18;
             // in a loop check the performance of the CPU
@@ -68,7 +68,7 @@ namespace GPGPU
                     var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
-                    solver.Compute(problems, 0, problems.Length, solver.GetBestParallelism());
+
                     watch.Restart();
                     var results = solver.Compute(problems, 0, problems.Length, solver.GetBestParallelism());
                     watch.Stop();

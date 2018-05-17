@@ -36,7 +36,7 @@ namespace GPGPU
             int problemCount,
             int streamCount,
             Action asyncAction = null,
-            int warpCount = 1)
+            int warpCount = 8)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
@@ -83,6 +83,7 @@ namespace GPGPU
             {
                 var offset = stream * problemsPerStream;
                 var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
+
                 gpuAs[stream] = gpu.Allocate<int>(localProblemsCount * n);
                 gpuBs[stream] = gpu.Allocate<int>(localProblemsCount * n);
                 shortestSynchronizingWordLength[stream] = gpu.Allocate<int>(localProblemsCount);
@@ -136,17 +137,25 @@ namespace GPGPU
 
 #if (benchmark)
 #endif
-            var results = Enumerable.Range(0, streamCount).SelectMany(i => gpuResultsIsSynchronizable[i].Zip(gpuResultsShortestSynchronizingWordLength[i], (isSyncable, shortestWordLength)
-                            => new ComputationResult()
-                            {
-                                computationType = ComputationType.GPU,
-                                size = problemsToSolve[beginningIndex].size,
-                                isSynchronizable = isSyncable,
-                                shortestSynchronizingWordLength = shortestWordLength,
-                                algorithmName = GetType().Name
-                            }
-                ).ToArray()
-            ).ToArray();
+            var results = new ComputationResult[problemCount];
+
+            Parallel.For(0, streamCount, stream =>
+            {
+                var offset = stream * problemsPerStream;
+                var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
+
+                for (int i = 0; i < localProblemsCount; i++)
+                {
+                    results[offset + i] = new ComputationResult()
+                    {
+                        computationType = ComputationType.GPU,
+                        size = problemsToSolve[beginningIndex].size,
+                        isSynchronizable = gpuResultsIsSynchronizable[stream][i],
+                        shortestSynchronizingWordLength = gpuResultsShortestSynchronizingWordLength[stream][i],
+                        algorithmName = GetType().Name
+                    };
+                }
+            });
 
             foreach (var arrays in new IEnumerable<Array>[] { gpuAs, gpuBs, isSynchronizable, shortestSynchronizingWordLength })
                 foreach (var array in arrays)
