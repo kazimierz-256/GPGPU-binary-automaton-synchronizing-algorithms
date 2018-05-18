@@ -28,7 +28,7 @@ namespace GPGPU
                 //new CPU(),
                 new SlimCPU(),
                 //new SlimCPUGPU(),
-                new SlimGPUQueue(),
+                //new SlimGPUQueue(),
                 //new SlimGPUBreakthrough(),
                 //new SlimGPULeastSynchronizable()
             };
@@ -48,8 +48,8 @@ namespace GPGPU
             var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Sqrt(Math.Sqrt(Math.Sqrt(Math.Sqrt(2))));
-            var initialProblemSamplingCount = 1 << 17;
-            var maximalProblemCount = 1 << 18;
+            var initialProblemSamplingCount = 1 << 14;
+            var maximalProblemCount = 1 << 19;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
             for (int n = (int)doublePrecisionN; n < maximalProblemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))

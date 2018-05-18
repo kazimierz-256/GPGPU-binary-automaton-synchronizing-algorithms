@@ -52,8 +52,11 @@ namespace GPGPU
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
             // in order to atomically add to a checking array (designed for queue consistency) one int is used by four threads, so in a reeeeaally pessimistic case 255 is the maximum number of threads (everyone go to the same vertex)
-            var maximumWarps = Math.Min(gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize,
-                255 / gpu.Device.Attributes.WarpSize);
+            // -1 for the already discovered vertex
+            var maximumWarps = Math.Min(
+                gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize,
+                (255 - 1) / gpu.Device.Attributes.WarpSize
+                );
             if (warpCount > maximumWarps)
                 warpCount = maximumWarps;
             if (problemCount < streamCount)
