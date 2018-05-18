@@ -24,13 +24,9 @@ namespace GPGPU
             //var n = 1 << 18;
             var theSolver = new IComputable[]
             {
-                //new SlimGPUAllAtOnce(),
-                //new CPU(),
                 new SlimCPU(),
                 new SlimCPUGPU(),
                 new SlimGPUQueue(),
-                //new SlimGPUBreakthrough(),
-                //new SlimGPULeastSynchronizable()
             };
             //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
@@ -48,7 +44,7 @@ namespace GPGPU
             var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Sqrt(Math.Sqrt(Math.Sqrt(Math.Sqrt(2))));
-            var initialProblemSamplingCount = 1 << 14;
+            var initialProblemSamplingCount = 1 << 17;
             var maximalProblemCount = 1 << 18;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;

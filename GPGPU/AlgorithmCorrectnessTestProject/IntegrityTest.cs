@@ -17,14 +17,9 @@ namespace AlgorithmCorrectnessTestProject
     {
         private IComputable[] computables = new IComputable[]
         {
-            //new CPU(),
             new SlimCPU(),
-            //new SlimGPU(),// we're having issues with memory allocation...
             new SlimGPUQueue(),
             new SlimCPUGPU(),
-            //new SlimGPUAllAtOnce(),
-            //new SlimGPUBreakthrough(),
-            //new SlimGPULeastSynchronizable(),
         };
 
         private void AssertOneProblem(Problem problem)
@@ -58,19 +53,11 @@ namespace AlgorithmCorrectnessTestProject
             // probably this is due to hardcoding problem size during compilation...
             var sizes = Enumerable.Range(13, 1).ToArray();
             var seeds = Enumerable.Range(12456, 8).ToArray();
-            //var invariantProblems = new List<Problem>()
-            //{
-            //    Problem.GenerateWorstCase(3),
-            //    Problem.GenerateWorstCase(7),
-            //    Problem.GenerateWorstCase(13),
-            //};
 
             foreach (var seed in seeds)
             {
                 foreach (var size in sizes)
                 {
-                    // 10, 6
-                    // 11, 5 don't work correctly...
                     var problems = Problem.GetArrayOfProblems(n, size, seed);//.Concat(invariantProblems).ToArray();//.Skip(10).Take(6);
                     var results = new ComputationResult[computables.Length][];
                     var computableId = 0;
@@ -88,6 +75,7 @@ namespace AlgorithmCorrectnessTestProject
 
         private void AssertSameResults(ComputationResult[][] results, IComputable[] computables, Problem[] problems)
         {
+            // this is used only for the older CPU algorithm
             //for (int computable = 0; computable < computables.Length; computable++)
             //{
             //    if (computables[computable] is CPU)
