@@ -15,9 +15,9 @@ namespace GPGPU
         public void Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism)
             => ComputePart(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, degreeOfParallelism);
 
-        public void ComputePart(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism, float cpuPart = .7f)
+        public void ComputePart(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism, float cpuPart = .5f)
         {
-            int cpuProblems = (int)Math.Floor(problemsToSolve.Length * cpuPart);
+            int cpuProblems = (int)Math.Round(problemsToSolve.Length * cpuPart);
             var thread = new Thread(() =>
             {
                 new SlimCPU().Compute(problemsToSolve, 0, computationResults, 0, cpuProblems, Environment.ProcessorCount - 1);

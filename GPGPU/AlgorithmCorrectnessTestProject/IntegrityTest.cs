@@ -21,8 +21,7 @@ namespace AlgorithmCorrectnessTestProject
             new SlimCPU(),
             //new SlimGPU(),// we're having issues with memory allocation...
             new SlimGPUQueue(),
-            //new SlimCPUGPU(),
-            //new SlimCPUGPU(),
+            new SlimCPUGPU(),
             //new SlimGPUAllAtOnce(),
             //new SlimGPUBreakthrough(),
             //new SlimGPULeastSynchronizable(),
@@ -53,7 +52,7 @@ namespace AlgorithmCorrectnessTestProject
         [TestMethod]
         public void LargeIntegrityCheck()
         {
-            var n = 1 << 13;
+            var n = 1 << 17;
             // there are issues with multiple sized problems!
             // individually tests pass...
             // probably this is due to hardcoding problem size during compilation...
