@@ -11,34 +11,24 @@ namespace AlgorithmCorrectnessTestProject
     public class SimpleAutomataTests
     {
         private IComputable GetLatestComputingUnit() => new SlimCPU();
-
-        [TestMethod]
-        public void SmallWorstCase()
+        private void CheckWorstCase(int n)
         {
-            var problem = Problem.GenerateWorstCase(3);
-
-            var result = GetLatestComputingUnit().Compute(new[] { problem }, 0, 1, GetLatestComputingUnit().GetBestParallelism())[0];
-
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.isSynchronizable);
-            //Assert.IsNotNull(result.shortestSynchronizingWord);
-            //Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual(4, result.shortestSynchronizingWordLength);
-        }
-        [TestMethod]
-        public void LargeWorstCase()
-        {
-            var n = 13;
             var problem = Problem.GenerateWorstCase(n);
 
-            var result = GetLatestComputingUnit().Compute(new[] { problem }, 0, 1, GetLatestComputingUnit().GetBestParallelism())[0];
+            var result = new ComputationResult[1];
+            GetLatestComputingUnit().Compute(new[] { problem }, 0, result, 0, 1, GetLatestComputingUnit().GetBestParallelism());
 
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.isSynchronizable);
+            Assert.IsNotNull(result[0]);
+            Assert.IsTrue(result[0].isSynchronizable);
             //Assert.IsNotNull(result.shortestSynchronizingWord);
             //Assert.IsTrue(Verify.VerifyValidityOfSynchronizingWord(problem, result, 1));
-            Assert.AreEqual((n - 1) * (n - 1), result.shortestSynchronizingWordLength);
+            Assert.AreEqual((n - 1) * (n - 1), result[0].shortestSynchronizingWordLength);
         }
+
+        [TestMethod]
+        public void SmallWorstCase() => CheckWorstCase(3);
+        [TestMethod]
+        public void LargeWorstCase() => CheckWorstCase(13);
 
     }
 }

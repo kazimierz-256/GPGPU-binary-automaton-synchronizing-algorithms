@@ -20,19 +20,20 @@ namespace GPGPU
 
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
-        public ComputationResult ComputeOne(Problem problemToSolve)
-        => Compute(new[] { problemToSolve }, 0, 1, 1).First();
-
-        public ComputationResult[] Compute(
+        public void Compute(
             Problem[] problemsToSolve,
-            int beginningIndex,
+            int problemsReadingIndex,
+            ComputationResult[] computationResults,
+            int resultsWritingIndex,
             int problemCount,
             int streamCount)
-            => Compute(problemsToSolve, beginningIndex, problemCount, streamCount, null);
+            => ComputeAction(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, streamCount);
 
-        public ComputationResult[] Compute(
+        public void ComputeAction(
             Problem[] problemsToSolve,
-            int beginningIndex,
+            int problemsReadingIndex,
+            ComputationResult[] computationResults,
+            int resultsWritingIndex,
             int problemCount,
             int streamCount,
             Action asyncAction = null,
@@ -45,7 +46,7 @@ namespace GPGPU
             var benchmarkTiming = new Stopwatch();
 #endif
             var gpu = Gpu.Default;
-            var n = problemsToSolve[beginningIndex].size;
+            var n = problemsToSolve[problemsReadingIndex].size;
 
             var power = 1 << n;
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
@@ -93,8 +94,8 @@ namespace GPGPU
                 var matrixB = new int[localProblemsCount * n];
                 Parallel.For(0, localProblemsCount, problem =>
                 {
-                    Array.ConstrainedCopy(problemsToSolve[beginningIndex + offset + problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
-                    Array.ConstrainedCopy(problemsToSolve[beginningIndex + offset + problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
+                    Array.ConstrainedCopy(problemsToSolve[problemsReadingIndex + offset + problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
+                    Array.ConstrainedCopy(problemsToSolve[problemsReadingIndex + offset + problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
                 });
 
                 streams[stream].Copy(matrixA, gpuAs[stream]);
@@ -135,7 +136,6 @@ namespace GPGPU
 
 #if (benchmark)
 #endif
-            var results = new ComputationResult[problemCount];
 
             Parallel.For(0, streamCount, stream =>
             {
@@ -144,14 +144,16 @@ namespace GPGPU
 
                 for (int i = 0; i < localProblemsCount; i++)
                 {
-                    results[offset + i] = new ComputationResult()
+                    computationResults[resultsWritingIndex + offset + i] = new ComputationResult()
                     {
                         computationType = ComputationType.GPU,
-                        size = problemsToSolve[beginningIndex].size,
+                        size = problemsToSolve[problemsReadingIndex].size,
                         isSynchronizable = gpuResultsIsSynchronizable[stream][i],
                         shortestSynchronizingWordLength = gpuResultsShortestSynchronizingWordLength[stream][i],
                         algorithmName = GetType().Name
                     };
+                    if (gpuResultsIsSynchronizable[stream][i] && gpuResultsShortestSynchronizingWordLength[stream][i] > maximumPermissibleWordLength)
+                        throw new Exception("Cerny conjecture is false");
                 }
             });
 
@@ -162,17 +164,13 @@ namespace GPGPU
             foreach (var stream in streams)
                 stream.Dispose();
 
-            if (results.Any(result => result.isSynchronizable && result.shortestSynchronizingWordLength > maximumPermissibleWordLength))
-                throw new Exception("Cerny conjecture is false");
-
 #if (benchmark)
-            results[0].benchmarkResult = new BenchmarkResult
+            computationResults[resultsWritingIndex].benchmarkResult = new BenchmarkResult
             {
                 benchmarkedTime = benchmarkTiming.Elapsed,
                 totalTime = totalTiming.Elapsed
             };
 #endif
-            return results;
         }
 
         public static void Kernel(

@@ -14,7 +14,7 @@ namespace GPGPU
     {
         public int GetBestParallelism() => Environment.ProcessorCount;
 
-        public ComputationResult[] Compute(Problem[] problemsToSolve, int beginningIndex, int problemCount, int degreeOfParallelism)
+        public void Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism)
         {
             if (degreeOfParallelism > problemCount)
             {
@@ -22,35 +22,33 @@ namespace GPGPU
             }
             if (degreeOfParallelism == 1)
             {
-                return ComputeMany(problemsToSolve, beginningIndex, problemCount);
+                ComputeMany(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount);
             }
             else
             {
-                var results = new ComputationResult[problemCount];
                 var partition = (problemCount + degreeOfParallelism - 1) / degreeOfParallelism;
                 Parallel.For(0, degreeOfParallelism, i =>
                 {
-                    var miniResults = ComputeMany(
+                    ComputeMany(
                         problemsToSolve,
-                        beginningIndex + i * partition,
+                        problemsReadingIndex + i * partition,
+                        computationResults,
+                        resultsWritingIndex + i * partition,
                         Math.Min(partition, problemCount - i * partition)
                         );
-                    Array.ConstrainedCopy(miniResults, 0, results, beginningIndex + i * partition, miniResults.Length);
                 });
-                return results;
             }
         }
 
-        private ComputationResult[] ComputeMany(Problem[] problemsToSolve, int beginningIndex, int problemCount)
+        private void ComputeMany(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount)
         {
-            var results = new ComputationResult[problemCount];
 #if (benchmark)
             var totalTiming = new Stopwatch();
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
 #endif
 
-            var n = problemsToSolve[beginningIndex].size;
+            var n = problemsToSolve[problemsReadingIndex].size;
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
@@ -62,7 +60,7 @@ namespace GPGPU
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
-            for (int problem = beginningIndex, endingIndex = beginningIndex + problemCount; problem < endingIndex; problem++, localProblemId++)
+            for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
 #if (benchmark)
                 benchmarkTiming.Start();
@@ -86,8 +84,8 @@ namespace GPGPU
 
                 for (int i = 0; i < n; i++)
                 {
-                    precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixA[i]);
-                    precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemsToSolve[problem].stateTransitioningMatrixB[i]);
+                    precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixA[i]);
+                    precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixB[i]);
                 }
 
                 //var maximumBreadth = 0;
@@ -167,7 +165,7 @@ namespace GPGPU
 
                 // finished main loop
 
-                results[problem - beginningIndex] = new ComputationResult()
+                computationResults[writingId] = new ComputationResult()
                 {
                     benchmarkResult = new BenchmarkResult(),
                     computationType = ComputationType.CPU_Parallel,
@@ -180,17 +178,16 @@ namespace GPGPU
 
                 if (discoveredSingleton)
                 {
-                    results[problem - beginningIndex].shortestSynchronizingWordLength = currentNextDistance;
+                    computationResults[writingId].shortestSynchronizingWordLength = currentNextDistance;
                     if (currentNextDistance > maximumPermissibleWordLength)
                         throw new Exception("Cerny conjecture is false");
                 }
 
             }
 #if (benchmark)
-            results[0].benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
-            results[0].benchmarkResult.totalTime = totalTiming.Elapsed;
+            computationResults[resultsWritingIndex].benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
+            computationResults[resultsWritingIndex].benchmarkResult.totalTime = totalTiming.Elapsed;
 #endif
-            return results;
         }
     }
 }

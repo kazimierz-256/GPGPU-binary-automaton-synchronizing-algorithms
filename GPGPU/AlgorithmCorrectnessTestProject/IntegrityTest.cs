@@ -30,11 +30,17 @@ namespace AlgorithmCorrectnessTestProject
 
         private void AssertOneProblem(Problem problem)
         {
-            var results = computables
-                .Select(computable => computable.Compute(new[] { problem }, 0, 1, computable.GetBestParallelism()))
-                .ToArray();
+            var results = new ComputationResult[computables.Length][];
+            var problems = new[] { problem };
+            var computableId = 0;
+            foreach (var computable in computables)
+            {
+                results[computableId] = new ComputationResult[1];
+                computable.Compute(problems, 0, results[computableId], 0, 1, computable.GetBestParallelism());
+                computableId++;
+            }
 
-            AssertSameResults(results, computables, new[] { problem });
+            AssertSameResults(results, computables, problems);
         }
 
         [TestMethod]
@@ -67,10 +73,14 @@ namespace AlgorithmCorrectnessTestProject
                     // 10, 6
                     // 11, 5 don't work correctly...
                     var problems = Problem.GetArrayOfProblems(n, size, seed);//.Concat(invariantProblems).ToArray();//.Skip(10).Take(6);
-
-                    var results = computables
-                        .Select(computable => computable.Compute(problems, 0, problems.Length, computable.GetBestParallelism()))
-                        .ToArray();
+                    var results = new ComputationResult[computables.Length][];
+                    var computableId = 0;
+                    foreach (var computable in computables)
+                    {
+                        results[computableId] = new ComputationResult[problems.Length];
+                        computable.Compute(problems, 0, results[computableId], 0, problems.Length, computable.GetBestParallelism());
+                        computableId++;
+                    }
 
                     AssertSameResults(results, computables, problems);
                 }

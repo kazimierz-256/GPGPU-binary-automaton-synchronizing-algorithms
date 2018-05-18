@@ -28,7 +28,7 @@ namespace GPGPU
                 //new CPU(),
                 new SlimCPU(),
                 //new SlimCPUGPUInbetween(),
-                //new SlimGPUQueue(),
+                new SlimGPUQueue(),
                 //new SlimGPUBreakthrough(),
                 //new SlimGPULeastSynchronizable()
             };
@@ -49,7 +49,7 @@ namespace GPGPU
 
             var sizeIncrease = Math.Sqrt(Math.Sqrt(Math.Sqrt(Math.Sqrt(2))));
             var initialProblemSamplingCount = 1 << 14;
-            var maximalProblemCount = 1 << 19;
+            var maximalProblemCount = 1 << 18;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
             for (int n = (int)doublePrecisionN; n < maximalProblemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
@@ -75,8 +75,9 @@ namespace GPGPU
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
 
+                    var results = new ComputationResult[problems.Length];
                     watch.Restart();
-                    var results = solver.Compute(problems, 0, problems.Length, solver.GetBestParallelism());
+                    solver.Compute(problems, 0, results, 0, problems.Length, solver.GetBestParallelism());
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
                     var summary = new ComputationResultSummary();
