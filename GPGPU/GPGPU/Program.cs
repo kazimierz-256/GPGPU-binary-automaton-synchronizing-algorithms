@@ -21,14 +21,12 @@ namespace GPGPU
 
             #region Program definitions
             const int problemSize = 13;
-            //var n = 1 << 18;
             var theSolver = new IComputable[]
             {
                 new SlimCPU(),
                 new SlimCPUGPU(),
                 new SlimGPUQueue(),
             };
-            //double sizeIncrease = 1;// Math.Pow(2, 1d / 2);
             #endregion
             Gpu.Default.Device.Print();
             const int problemSeed = 1234567;
@@ -46,14 +44,13 @@ namespace GPGPU
             var sizeIncrease = Math.Sqrt(Math.Sqrt(Math.Sqrt(Math.Sqrt(2))));
             var initialProblemSamplingCount = 1 << 17;
             var maximalProblemCount = 1 << 18;
-            // in a loop check the performance of the CPU
+
             double doublePrecisionN = initialProblemSamplingCount;
             for (int n = (int)doublePrecisionN; n < maximalProblemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             //for (int i = 0; i < 10; i++)
             {
                 csvBuilder.AppendLine();
                 csvBuilder.Append(problemSize).Append(",").Append(n);
-                var localSeed = random.Next();
                 foreach (var solver in theSolver)
                 {
                     computeLoopUsing(solver);
@@ -73,11 +70,7 @@ namespace GPGPU
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
                     var summary = new ComputationResultSummary();
-                    // TODO: fill in summary
-                    // TODO: pump summary into csv builder
-                    // TODO: export to csv
                     csvBuilder.Append(",").Append(Math.Round(n / computationElapsed.TotalSeconds));
-                    // TODO: create a google docs
                     var benchmarkedResults = results.Where(result => result.benchmarkResult != null && result.benchmarkResult.benchmarkedTime != null && result.benchmarkResult.totalTime != null);
                     var computationToTotalFraction = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
                         / benchmarkedResults.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
