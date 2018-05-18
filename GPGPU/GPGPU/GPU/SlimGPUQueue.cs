@@ -37,7 +37,7 @@ namespace GPGPU
             int problemCount,
             int streamCount,
             Action asyncAction = null,
-            int warpCount = 7)
+            int warpCount = 4)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
@@ -65,9 +65,9 @@ namespace GPGPU
             gpu.Copy(n, problemSize);
 
             var launchParameters = new LaunchParam(
-                new dim3(1, 1, 1),
+                new dim3(64, 1, 1),
                 new dim3(gpu.Device.Attributes.WarpSize * warpCount, 1, 1),
-                sizeof(int) * 2
+                sizeof(int) * 2 * 8
                 + power * sizeof(int) / 4
                 + (power / 2 + 1) * sizeof(ushort) * 2
                 + 2 * n * sizeof(ushort)
@@ -185,17 +185,18 @@ namespace GPGPU
             var n = problemSize.Value;
             var arrayCount = precomputedStateTransitioningMatrixA.Length / n;
             var power = 1 << n;
+            var writingOffsetMax = 8;
 
             #region Pointer setup
             var byteOffset = 0;
 
-            var queueEvenCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
-                   .Ptr(byteOffset / sizeof(int));
-            byteOffset += sizeof(int);
-
-            var queueOddCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
+            var queueCount = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
-            byteOffset += sizeof(int);
+            byteOffset += sizeof(int) * writingOffsetMax;
+
+            var queueIndex = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
+                   .Ptr(byteOffset / sizeof(int));
+            byteOffset += sizeof(int) * writingOffsetMax;
 
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
@@ -247,11 +248,12 @@ namespace GPGPU
                     consideringVertex += (blockDim.x / skipEvery))
                     isDiscoveredPtr[consideringVertex] = 0;
 
+                var readingQueueIndex = queueIndex;
                 if (threadIdx.x == 0)
                 {
                     shouldStop[0] = false;
-                    queueEvenCount[0] = 0;
-                    queueOddCount[0] = 1;
+                    queueCount[0] = 0;
+                    queueCount[0] = 1;
                     queueOdd[0] = (ushort)(power - 1);
                     // assuming n >= 2
                     isDiscoveredPtr[(power - 1) >> 2] = 1 << 24;
@@ -260,26 +262,29 @@ namespace GPGPU
                         gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
                         gpuB[i] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + i]);
                     }
+                    for (int i = 0; i < writingOffsetMax; i++)
+                    {
+                        readingQueueIndex[i] = 0;
+                    }
                 }
+                var readingOffset = 0;
                 var readingQueue = queueOdd;
                 var writingQueue = queueEven;
-                var readingQueueCount = queueOddCount;
-                var writingQueueCount = queueEvenCount;
+                var readingQueueCount = queueCount;
+                var writingQueueCount = readingQueueCount.Ptr(1);
 
                 nextDistance = 1;
-                int readingQueueCountCached = 1;
                 DeviceFunction.SyncThreads();
 
-                while (readingQueueCountCached > 0 && !shouldStop[0])
+                while (readingQueueCount[0] > 0 && !shouldStop[0])
                 {
-                    int myPart = (readingQueueCountCached + blockDim.x / skipEvery - 1) / (blockDim.x / skipEvery);
-                    int beginningPointer = threadIdx.x / skipEvery * myPart;
-                    int endingPointer = beginningPointer + myPart;
-                    if (readingQueueCountCached < endingPointer)
-                        endingPointer = readingQueueCountCached;
                     //Console.WriteLine("ac {3}, threadix {0}, begin {1}, end {2}", threadIdx.x, beginningPointer, endingPointer, ac);
-                    for (int iter = beginningPointer; iter < endingPointer; ++iter)
+                    while (readingQueueIndex[0] < readingQueueCount[0])
                     {
+                        var iter = DeviceFunction.AtomicAdd(readingQueueIndex, 1);
+                        if (iter >= readingQueueCount[0])
+                            break;
+
                         int consideringVertex = readingQueue[iter];
 
                         vertexAfterTransitionA = vertexAfterTransitionB = 0;
@@ -342,12 +347,29 @@ namespace GPGPU
                     ++nextDistance;
                     readingQueue = nextDistance % 2 == 0 ? queueEven : queueOdd;
                     writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
-                    readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
-                    writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
-                    DeviceFunction.SyncThreads();
-                    readingQueueCountCached = nextDistance % 2 == 0 ? queueEvenCount[0] : queueOddCount[0];
-                    if (threadIdx.x == 0)
-                        writingQueueCount[0] = 0;
+                    readingQueueCount = writingQueueCount;
+                    ++readingOffset;
+                    // readingOffset is now writingOffset
+                    if (readingOffset == writingOffsetMax - 1)
+                    {
+                        DeviceFunction.SyncThreads();
+                        writingQueueCount = queueCount;
+                        readingQueueIndex = queueIndex;
+                        if (threadIdx.x == 0)
+                        {
+                            for (int i = 0; i < readingOffset; i++)
+                            {
+                                queueCount[i] = 0;
+                                queueIndex[i] = 0;
+                            }
+                        }
+                        readingOffset = 0;
+                    }
+                    else
+                    {
+                        writingQueueCount = writingQueueCount.Ptr(1);
+                        readingQueueIndex = readingQueueIndex.Ptr(1);
+                    }
                     DeviceFunction.SyncThreads();
                 }
             }

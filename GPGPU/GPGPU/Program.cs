@@ -48,7 +48,7 @@ namespace GPGPU
             var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Sqrt(Math.Sqrt(Math.Sqrt(Math.Sqrt(2))));
-            var initialProblemSamplingCount = 1 << 14;
+            var initialProblemSamplingCount = 1 << 17;
             var maximalProblemCount = 1 << 18;
             // in a loop check the performance of the CPU
             double doublePrecisionN = initialProblemSamplingCount;
@@ -60,10 +60,6 @@ namespace GPGPU
                 var localSeed = random.Next();
                 foreach (var solver in theSolver)
                 {
-                    if (n >= (1 << 17) && !(solver is SlimCPU))
-                    {
-                        continue;
-                    }
                     computeLoopUsing(solver);
                 }
 
