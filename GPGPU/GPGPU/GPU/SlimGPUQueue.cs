@@ -15,8 +15,8 @@ namespace GPGPU
 {
     public class SlimGPUQueue : IComputable
     {
-
-        public int GetBestParallelism() => 16;
+        // the algorithm performs best when using 8 or 16 streams
+        public int GetBestParallelism() => 8;
 
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
@@ -53,7 +53,7 @@ namespace GPGPU
 
             // in order to atomically add to a checking array (designed for queue consistency) one int is used by four threads, so in a reeeeaally pessimistic case 255 is the maximum number of threads (everyone go to the same vertex)
             var maximumWarps = Math.Min(gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize,
-                ((1 << 6) - 1) / gpu.Device.Attributes.WarpSize);
+                255 / gpu.Device.Attributes.WarpSize);
             if (warpCount > maximumWarps)
                 warpCount = maximumWarps;
             if (problemCount < streamCount)
@@ -68,7 +68,7 @@ namespace GPGPU
                 new dim3(1, 1, 1),
                 new dim3(gpu.Device.Attributes.WarpSize * warpCount, 1, 1),
                 sizeof(int) * 2
-                + (power * sizeof(int) + 5 - 1) / 5
+                + power * sizeof(int) / 4
                 + (power / 2 + 1) * sizeof(ushort) * 2
                 + 2 * n * sizeof(ushort)
                 + sizeof(bool)
@@ -180,8 +180,6 @@ namespace GPGPU
             int[] shortestSynchronizingWordLength)
         {
             const int skipEvery = 1;
-            const int discoveriesInInt = 5;
-            const int fullMask = (1 << discoveriesInInt) - 1;
             if (threadIdx.x % skipEvery != 0)
                 return;
             var n = problemSize.Value;
@@ -201,7 +199,7 @@ namespace GPGPU
 
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
-            byteOffset += (power * sizeof(int) + discoveriesInInt - 1) / discoveriesInInt;
+            byteOffset += power * sizeof(int) / 4;
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(byteOffset / sizeof(ushort))
@@ -244,7 +242,7 @@ namespace GPGPU
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                for (int consideringVertex = threadIdx.x / skipEvery, endingVertex = (power - 1) / discoveriesInInt;
+                for (int consideringVertex = threadIdx.x / skipEvery, endingVertex = (power - 1) >> 2;
                     consideringVertex < endingVertex;
                     consideringVertex += (blockDim.x / skipEvery))
                     isDiscoveredPtr[consideringVertex] = 0;
@@ -255,7 +253,8 @@ namespace GPGPU
                     queueEvenCount[0] = 0;
                     queueOddCount[0] = 1;
                     queueOdd[0] = (ushort)(power - 1);
-                    isDiscoveredPtr[(power - 1) / discoveriesInInt] = 1 << ((power - 1) % discoveriesInInt);
+                    // assuming n >= 2
+                    isDiscoveredPtr[(power - 1) >> 2] = 1 << 24;
                     for (int i = 0; i < n; i++)
                     {
                         gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
@@ -293,11 +292,11 @@ namespace GPGPU
                             }
                         }
 
-                        var eightTimesRemainder = (vertexAfterTransitionA % discoveriesInInt) * 6;
+                        var eightTimesRemainder = (vertexAfterTransitionA % 4) << 3;
 
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA / discoveriesInInt] & (fullMask << eightTimesRemainder)))
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA >> 2] & (255 << eightTimesRemainder)))
                         {
-                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA / discoveriesInInt), 1 << eightTimesRemainder) & (fullMask << eightTimesRemainder);
+                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
                             if (0 == beforeAdded)
                             {
                                 if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
@@ -313,14 +312,14 @@ namespace GPGPU
                             }
                             else
                             {
-                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA / discoveriesInInt), 1 << eightTimesRemainder);
+                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 2), 1 << eightTimesRemainder);
                             }
                         }
 
-                        eightTimesRemainder = (vertexAfterTransitionB % discoveriesInInt) * 6;
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB / discoveriesInInt] & (fullMask << eightTimesRemainder)))
+                        eightTimesRemainder = (vertexAfterTransitionB % 4) << 3;
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB >> 2] & (255 << eightTimesRemainder)))
                         {
-                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB / discoveriesInInt), 1 << eightTimesRemainder) & (fullMask << eightTimesRemainder);
+                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder) & (255 << eightTimesRemainder);
                             if (0 == beforeAdded)
                             {
                                 if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
@@ -336,7 +335,7 @@ namespace GPGPU
                             }
                             else
                             {
-                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB / discoveriesInInt), 1 << eightTimesRemainder);
+                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 2), 1 << eightTimesRemainder);
                             }
                         }
                     }
