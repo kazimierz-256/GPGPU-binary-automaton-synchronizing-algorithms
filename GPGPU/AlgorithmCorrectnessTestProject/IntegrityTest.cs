@@ -22,7 +22,7 @@ namespace AlgorithmCorrectnessTestProject
             //new SlimGPU(),// we're having issues with memory allocation...
             new SlimGPUQueue(),
             //new SlimCPUGPU(),
-            //new SlimCPUGPUInbetween(),
+            //new SlimCPUGPU(),
             //new SlimGPUAllAtOnce(),
             //new SlimGPUBreakthrough(),
             //new SlimGPULeastSynchronizable(),

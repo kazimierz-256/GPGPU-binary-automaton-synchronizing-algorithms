@@ -27,7 +27,7 @@ namespace GPGPU
                 //new SlimGPUAllAtOnce(),
                 //new CPU(),
                 new SlimCPU(),
-                //new SlimCPUGPUInbetween(),
+                //new SlimCPUGPU(),
                 new SlimGPUQueue(),
                 //new SlimGPUBreakthrough(),
                 //new SlimGPULeastSynchronizable()

@@ -87,6 +87,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Shared\Problem.cs" />
     <Compile Include="GPU\SlimGPUQueue.cs" />
+    <Compile Include="CPU and GPU\SlimCPUGPU.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
