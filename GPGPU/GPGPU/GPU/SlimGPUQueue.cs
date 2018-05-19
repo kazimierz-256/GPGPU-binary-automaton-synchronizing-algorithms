@@ -52,10 +52,11 @@ namespace GPGPU
 
             // in order to atomically add to a checking array (designed for queue consistency) one int is used by four threads, so in a reeeeaally pessimistic case 255 is the maximum number of threads (everyone go to the same vertex)
             // -1 for the already discovered vertex
+            // at least 2*n+1 threads i.e. 27
             var threads = gpu.Device.Attributes.MaxThreadsPerBlock;
             var maximumThreads = Math.Min(
                 gpu.Device.Attributes.MaxThreadsPerBlock,
-                30
+                31 - 1
                 );
             if (threads > maximumThreads)
                 threads = maximumThreads;
@@ -198,9 +199,6 @@ namespace GPGPU
             bool[] isSynchronizing,
             int[] shortestSynchronizingWordLength)
         {
-            const int skipEvery = 1;
-            if (threadIdx.x % skipEvery != 0)
-                return;
             var n = problemSize.Value;
             var arrayCount = precomputedStateTransitioningMatrixA.Length / n;
             var power = 1 << n;
@@ -263,37 +261,42 @@ namespace GPGPU
             if (arrayCount < acEnd)
                 acEnd = arrayCount;
             index = acBegin * n;
-            DeviceFunction.SyncThreads();
+
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                for (int consideringVertex = threadIdx.x / skipEvery, endingVertex = (power - 1) / 6;
+                for (int consideringVertex = threadIdx.x, endingVertex = (power - 1) / 6;
                     consideringVertex < endingVertex;
-                    consideringVertex += (blockDim.x / skipEvery))
+                    consideringVertex += blockDim.x)
                     isDiscoveredPtr[consideringVertex] = 0;
 
-                if (threadIdx.x == 0)
+                if (threadIdx.x < n)
                 {
+                    gpuA[threadIdx.x] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + threadIdx.x]);
+                }
+                else if (threadIdx.x < (n << 1))
+                {
+
+                    gpuB[threadIdx.x - n] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + threadIdx.x - n]);
+                }
+                else if (threadIdx.x == (n << 1) + 1)
+                {
+                    readingQueueIndex[0] = 0;
                     shouldStop[0] = false;
                     queueEvenCount[0] = 0;
                     queueOddCount[0] = 1;
                     queueOdd[0] = (ushort)(power - 1);
                     // assuming n >= 2
                     isDiscoveredPtr[(power - 1) / 6] = 1 << (((power - 1) % 6) * 5);
-                    for (int i = 0; i < n; i++)
-                    {
-                        gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
-                        gpuB[i] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + i]);
-                    }
                 }
+
                 var readingQueue = queueOdd;
                 var writingQueue = queueEven;
                 var readingQueueCount = queueOddCount;
-                var writingQueueCount = queueEvenCount;
+                var writingQueueIndex = queueEvenCount;
 
                 nextDistance = 1;
                 int readingQueueCountCached = 1;
-                readingQueueIndex[0] = 0;
                 DeviceFunction.SyncThreads();
 
                 while (readingQueueCountCached > 0 && !shouldStop[0])
@@ -335,8 +338,8 @@ namespace GPGPU
                                     break;
                                 }
 
-                                var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
-                                writingQueue[writeToPointer] = (ushort)vertexAfterTransitionA;
+                                writingQueue[DeviceFunction.AtomicAdd(writingQueueIndex, 1)]
+                                    = (ushort)vertexAfterTransitionA;
                             }
                             else
                             {
@@ -363,8 +366,8 @@ namespace GPGPU
                                     break;
                                 }
 
-                                var writeToPointer = DeviceFunction.AtomicAdd(writingQueueCount, 1);
-                                writingQueue[writeToPointer] = (ushort)vertexAfterTransitionB;
+                                writingQueue[DeviceFunction.AtomicAdd(writingQueueIndex, 1)]
+                                    = (ushort)vertexAfterTransitionB;
                             }
                             else
                             {
@@ -374,16 +377,16 @@ namespace GPGPU
                             }
                         }
                     }
+                    DeviceFunction.SyncThreads();
                     ++nextDistance;
                     readingQueue = nextDistance % 2 == 0 ? queueEven : queueOdd;
                     writingQueue = nextDistance % 2 != 0 ? queueEven : queueOdd;
                     readingQueueCount = nextDistance % 2 == 0 ? queueEvenCount : queueOddCount;
-                    writingQueueCount = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
-                    DeviceFunction.SyncThreads();
+                    writingQueueIndex = nextDistance % 2 != 0 ? queueEvenCount : queueOddCount;
                     readingQueueCountCached = nextDistance % 2 == 0 ? queueEvenCount[0] : queueOddCount[0];
                     if (threadIdx.x == 0)
                     {
-                        writingQueueCount[0] = 0;
+                        writingQueueIndex[0] = 0;
                         readingQueueIndex[0] = 0;
                     }
                     DeviceFunction.SyncThreads();
