@@ -223,8 +223,8 @@ namespace GPGPU
             // must be the last among ints
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
-            var offset = (power * sizeof(int) + 5) / 6;
-            byteOffset += offset + (((offset % sizeof(int)) & 1) == 1 ? 1 : 0);
+            var complexOffset = (power * sizeof(int) + 5) / 6;
+            byteOffset += complexOffset + (((complexOffset % sizeof(int)) & 1) == 1 ? 1 : 0);
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(byteOffset / sizeof(ushort))
