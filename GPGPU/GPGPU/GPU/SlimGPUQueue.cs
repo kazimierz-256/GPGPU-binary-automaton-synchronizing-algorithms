@@ -36,8 +36,7 @@ namespace GPGPU
             int resultsWritingIndex,
             int problemCount,
             int streamCount,
-            Action asyncAction = null,
-            int warpCount = 7)
+            Action asyncAction = null)
         // cannot be more warps since more memory should be allocated
         {
 #if (benchmark)
@@ -53,27 +52,30 @@ namespace GPGPU
 
             // in order to atomically add to a checking array (designed for queue consistency) one int is used by four threads, so in a reeeeaally pessimistic case 255 is the maximum number of threads (everyone go to the same vertex)
             // -1 for the already discovered vertex
-            var threads = warpCount * gpu.Device.Attributes.WarpSize;
+            var threads = gpu.Device.Attributes.MaxThreadsPerBlock;
             var maximumThreads = Math.Min(
                 gpu.Device.Attributes.MaxThreadsPerBlock,
-                //(255 - 1)
                 30
                 );
             if (threads > maximumThreads)
                 threads = maximumThreads;
+
             if (problemCount < streamCount)
                 streamCount = problemCount;
+
             var problemsPerStream = (problemCount + streamCount - 1) / streamCount;
             var streams = Enumerable.Range(0, streamCount)
                 .Select(_ => gpu.CreateStream()).ToArray();
 
             gpu.Copy(n, problemSize);
 
+            var isDiscoveredComplexOffset = (power * sizeof(int) + 5) / 6;
+
             var launchParameters = new LaunchParam(
                 new dim3(1 << 9, 1, 1),
                 new dim3(threads, 1, 1),
                 sizeof(int) * 3
-                + (power * sizeof(int) + 5) / 6
+                + isDiscoveredComplexOffset + (((isDiscoveredComplexOffset % sizeof(int)) & 1) == 1 ? 1 : 0)
                 + (power / 2 + 1) * sizeof(ushort) * 2
                 + 2 * n * sizeof(ushort)
                 + sizeof(bool)
@@ -99,8 +101,20 @@ namespace GPGPU
                 var matrixB = new int[localProblemsCount * n];
                 Parallel.For(0, localProblemsCount, problem =>
                 {
-                    Array.ConstrainedCopy(problemsToSolve[problemsReadingIndex + offset + problem].stateTransitioningMatrixA, 0, matrixA, problem * n, n);
-                    Array.ConstrainedCopy(problemsToSolve[problemsReadingIndex + offset + problem].stateTransitioningMatrixB, 0, matrixB, problem * n, n);
+                    Array.ConstrainedCopy(
+                        problemsToSolve[problemsReadingIndex + offset + problem].stateTransitioningMatrixA,
+                        0,
+                        matrixA,
+                        problem * n,
+                        n
+                        );
+                    Array.ConstrainedCopy(
+                        problemsToSolve[problemsReadingIndex + offset + problem].stateTransitioningMatrixB,
+                        0,
+                        matrixB,
+                        problem * n,
+                        n
+                        );
                 });
 
                 streams[stream].Copy(matrixA, gpuAs[stream]);
@@ -137,10 +151,10 @@ namespace GPGPU
                 streamId++;
             }
 
-            gpu.Synchronize();
-
 #if (benchmark)
+            gpu.Synchronize();
 #endif
+
 
             Parallel.For(0, streamCount, stream =>
             {
@@ -206,9 +220,11 @@ namespace GPGPU
                 .Ptr(byteOffset / sizeof(int));
             byteOffset += sizeof(int);
 
+            // must be the last among ints
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
-            byteOffset += (power * sizeof(int) + 5) / 6;
+            var offset = (power * sizeof(int) + 5) / 6;
+            byteOffset += offset + (((offset % sizeof(int)) & 1) == 1 ? 1 : 0);
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(byteOffset / sizeof(ushort))
@@ -301,13 +317,13 @@ namespace GPGPU
                             }
                         }
 
-                        var eightTimesRemainder = (vertexAfterTransitionA % 6) * 5;
+                        var isDiscoveredOffset = (vertexAfterTransitionA % 6) * 5;
 
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA / 6] & (31 << eightTimesRemainder)))
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA / 6] & (31 << isDiscoveredOffset)))
                         {
                             var beforeAdded = DeviceFunction.AtomicAdd(
                                 isDiscoveredPtr.Ptr(vertexAfterTransitionA / 6),
-                                1 << eightTimesRemainder) & (31 << eightTimesRemainder);
+                                1 << isDiscoveredOffset) & (31 << isDiscoveredOffset);
 
                             if (0 == beforeAdded)
                             {
@@ -326,16 +342,16 @@ namespace GPGPU
                             {
                                 DeviceFunction.AtomicSub(
                                     isDiscoveredPtr.Ptr(vertexAfterTransitionA / 6),
-                                    1 << eightTimesRemainder);
+                                    1 << isDiscoveredOffset);
                             }
                         }
 
-                        eightTimesRemainder = (vertexAfterTransitionB % 6) * 5;
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB / 6] & (31 << eightTimesRemainder)))
+                        isDiscoveredOffset = (vertexAfterTransitionB % 6) * 5;
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB / 6] & (31 << isDiscoveredOffset)))
                         {
                             var beforeAdded = DeviceFunction.AtomicAdd(
                                 isDiscoveredPtr.Ptr(vertexAfterTransitionB / 6),
-                                1 << eightTimesRemainder) & (31 << eightTimesRemainder);
+                                1 << isDiscoveredOffset) & (31 << isDiscoveredOffset);
 
                             if (0 == beforeAdded)
                             {
@@ -354,7 +370,7 @@ namespace GPGPU
                             {
                                 DeviceFunction.AtomicSub(
                                     isDiscoveredPtr.Ptr(vertexAfterTransitionB / 6),
-                                    1 << eightTimesRemainder);
+                                    1 << isDiscoveredOffset);
                             }
                         }
                     }
