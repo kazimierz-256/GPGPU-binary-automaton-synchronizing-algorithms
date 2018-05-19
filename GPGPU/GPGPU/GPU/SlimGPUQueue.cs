@@ -53,12 +53,14 @@ namespace GPGPU
 
             // in order to atomically add to a checking array (designed for queue consistency) one int is used by four threads, so in a reeeeaally pessimistic case 255 is the maximum number of threads (everyone go to the same vertex)
             // -1 for the already discovered vertex
-            var maximumWarps = Math.Min(
-                gpu.Device.Attributes.MaxThreadsPerBlock / gpu.Device.Attributes.WarpSize,
-                (255 - 1) / gpu.Device.Attributes.WarpSize
+            var threads = warpCount * gpu.Device.Attributes.WarpSize;
+            var maximumThreads = Math.Min(
+                gpu.Device.Attributes.MaxThreadsPerBlock,
+                //(255 - 1)
+                30
                 );
-            if (warpCount > maximumWarps)
-                warpCount = maximumWarps;
+            if (threads > maximumThreads)
+                threads = maximumThreads;
             if (problemCount < streamCount)
                 streamCount = problemCount;
             var problemsPerStream = (problemCount + streamCount - 1) / streamCount;
@@ -69,9 +71,9 @@ namespace GPGPU
 
             var launchParameters = new LaunchParam(
                 new dim3(1 << 9, 1, 1),
-                new dim3(14, 1, 1),
+                new dim3(threads, 1, 1),
                 sizeof(int) * 3
-                + power * sizeof(int) / 8
+                + (power * sizeof(int) + 5) / 6
                 + (power / 2 + 1) * sizeof(ushort) * 2
                 + 2 * n * sizeof(ushort)
                 + sizeof(bool)
@@ -206,7 +208,7 @@ namespace GPGPU
 
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
-            byteOffset += (power * sizeof(int)) / 8;
+            byteOffset += (power * sizeof(int) + 5) / 6;
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
                 .Ptr(byteOffset / sizeof(ushort))
@@ -249,7 +251,7 @@ namespace GPGPU
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
                 // cleanup
-                for (int consideringVertex = threadIdx.x / skipEvery, endingVertex = (power - 1) >> 3;
+                for (int consideringVertex = threadIdx.x / skipEvery, endingVertex = (power - 1) / 6;
                     consideringVertex < endingVertex;
                     consideringVertex += (blockDim.x / skipEvery))
                     isDiscoveredPtr[consideringVertex] = 0;
@@ -261,7 +263,7 @@ namespace GPGPU
                     queueOddCount[0] = 1;
                     queueOdd[0] = (ushort)(power - 1);
                     // assuming n >= 2
-                    isDiscoveredPtr[(power - 1) >> 3] = 1 << (4 * ((power - 1) % 8));
+                    isDiscoveredPtr[(power - 1) / 6] = 1 << (((power - 1) % 6) * 5);
                     for (int i = 0; i < n; i++)
                     {
                         gpuA[i] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + i]);
@@ -299,11 +301,14 @@ namespace GPGPU
                             }
                         }
 
-                        var eightTimesRemainder = (vertexAfterTransitionA % 8) << 2;
+                        var eightTimesRemainder = (vertexAfterTransitionA % 6) * 5;
 
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA >> 3] & (15 << eightTimesRemainder)))
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionA / 6] & (31 << eightTimesRemainder)))
                         {
-                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 3), 1 << eightTimesRemainder) & (15 << eightTimesRemainder);
+                            var beforeAdded = DeviceFunction.AtomicAdd(
+                                isDiscoveredPtr.Ptr(vertexAfterTransitionA / 6),
+                                1 << eightTimesRemainder) & (31 << eightTimesRemainder);
+
                             if (0 == beforeAdded)
                             {
                                 if (0 == (vertexAfterTransitionA & (vertexAfterTransitionA - 1)))
@@ -319,14 +324,19 @@ namespace GPGPU
                             }
                             else
                             {
-                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionA >> 3), 1 << eightTimesRemainder);
+                                DeviceFunction.AtomicSub(
+                                    isDiscoveredPtr.Ptr(vertexAfterTransitionA / 6),
+                                    1 << eightTimesRemainder);
                             }
                         }
 
-                        eightTimesRemainder = (vertexAfterTransitionB % 8) << 2;
-                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB >> 3] & (15 << eightTimesRemainder)))
+                        eightTimesRemainder = (vertexAfterTransitionB % 6) * 5;
+                        if (0 == (isDiscoveredPtr[vertexAfterTransitionB / 6] & (31 << eightTimesRemainder)))
                         {
-                            var beforeAdded = DeviceFunction.AtomicAdd(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 3), 1 << eightTimesRemainder) & (15 << eightTimesRemainder);
+                            var beforeAdded = DeviceFunction.AtomicAdd(
+                                isDiscoveredPtr.Ptr(vertexAfterTransitionB / 6),
+                                1 << eightTimesRemainder) & (31 << eightTimesRemainder);
+
                             if (0 == beforeAdded)
                             {
                                 if (0 == (vertexAfterTransitionB & (vertexAfterTransitionB - 1)))
@@ -342,7 +352,9 @@ namespace GPGPU
                             }
                             else
                             {
-                                DeviceFunction.AtomicSub(isDiscoveredPtr.Ptr(vertexAfterTransitionB >> 3), 1 << eightTimesRemainder);
+                                DeviceFunction.AtomicSub(
+                                    isDiscoveredPtr.Ptr(vertexAfterTransitionB / 6),
+                                    1 << eightTimesRemainder);
                             }
                         }
                     }
