@@ -17,9 +17,8 @@ namespace GPGPU
         public void Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism)
         {
             if (degreeOfParallelism > problemCount)
-            {
                 degreeOfParallelism = problemCount;
-            }
+
             if (degreeOfParallelism == 1)
             {
                 ComputeMany(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount);
