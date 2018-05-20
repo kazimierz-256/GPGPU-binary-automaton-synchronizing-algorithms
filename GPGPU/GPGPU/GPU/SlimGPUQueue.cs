@@ -156,7 +156,7 @@ namespace GPGPU
             gpu.Synchronize();
 #endif
 
-
+            // check if it works in stream synchronization! (few lines above)
             Parallel.For(0, streamCount, stream =>
             {
                 var offset = stream * problemsPerStream;
@@ -276,7 +276,6 @@ namespace GPGPU
                 }
                 else if (threadIdx.x < (n << 1))
                 {
-
                     gpuB[threadIdx.x - n] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + threadIdx.x - n]);
                 }
                 else if (threadIdx.x == (n << 1) + 1)

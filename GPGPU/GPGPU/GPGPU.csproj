@@ -76,7 +76,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CPU\SlimCPUSkipper.cs" />
     <Compile Include="CPU\SlimCPU.cs" />
+    <Compile Include="CPU and GPU\SuperSlimGPUBreakthrough.cs" />
     <Compile Include="Interfaces\IComputable.cs" />
     <Compile Include="Result veryfier\Verify.cs" />
     <Compile Include="Shared\BenchmarkResult.cs" />

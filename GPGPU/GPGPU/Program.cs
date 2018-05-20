@@ -23,9 +23,10 @@ namespace GPGPU
             const int problemSize = 13;
             var theSolver = new IComputable[]
             {
-                new SlimCPU(),
-                new SlimCPUGPU(),
+                //new SlimCPU(),
+                //new SlimCPUGPU(),
                 new SlimGPUQueue(),
+                new SuperSlimGPUBreakthrough()
             };
             #endregion
             Gpu.Default.Device.Print();

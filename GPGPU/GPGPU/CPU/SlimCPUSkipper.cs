@@ -1,4 +1,4 @@
-﻿#define benchmark
+﻿//#define benchmark
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 namespace GPGPU
 {
-    public class SlimCPU : IComputable
+    public class SlimCPUSkipper : IComputable
     {
         public int GetBestParallelism() => Environment.ProcessorCount;
 
@@ -64,6 +64,10 @@ namespace GPGPU
             var precomputedStateTransitioningMatrixB = new ushort[n];
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
+                if (computationResults[readingId].isSynchronizable)
+                {
+                    continue;
+                }
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
