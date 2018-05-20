@@ -156,7 +156,7 @@ namespace GPGPU
             gpu.Synchronize();
 #endif
 
-            // check if it works in stream synchronization! (few lines above)
+
             Parallel.For(0, streamCount, stream =>
             {
                 var offset = stream * problemsPerStream;
