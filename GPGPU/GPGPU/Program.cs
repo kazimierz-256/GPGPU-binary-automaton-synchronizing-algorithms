@@ -61,7 +61,7 @@ namespace GPGPU
                 Console.WriteLine();
                 void computeLoopUsing(IComputable solver)
                 {
-                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed);
+                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed + n);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
 
