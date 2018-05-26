@@ -58,8 +58,8 @@ namespace GPGPU
                 Console.ResetColor();
                 Console.WriteLine();
 
-                var latestCPUPerformance = TimeSpan.Zero;
-                var latestGPUPerformance = TimeSpan.Zero;
+                var latestCPUPerformance = TimeSpan.FromSeconds(1);
+                var latestGPUPerformance = TimeSpan.FromSeconds(1);
                 csvBuilder.AppendLine();
                 csvBuilder.Append(problemSize).Append(",").Append(n);
                 if (problems.Length != n)
