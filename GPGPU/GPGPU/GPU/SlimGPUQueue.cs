@@ -180,6 +180,7 @@ namespace GPGPU
             foreach (var arrays in new IEnumerable<Array>[] { gpuAs, gpuBs, isSynchronizable, shortestSynchronizingWordLength })
                 foreach (var array in arrays)
                     Gpu.Free(array);
+            Gpu.FreeAllImplicitMemory();
 
             foreach (var stream in streams)
                 stream.Dispose();
