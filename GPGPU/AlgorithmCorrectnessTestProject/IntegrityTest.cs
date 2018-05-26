@@ -55,11 +55,12 @@ namespace AlgorithmCorrectnessTestProject
             var sizes = Enumerable.Range(13, 1).ToArray();
             var seeds = Enumerable.Range(12456, 8).ToArray();
 
+            var problems = new Problem[n];
             foreach (var seed in seeds)
             {
                 foreach (var size in sizes)
                 {
-                    var problems = Problem.GetArrayOfProblems(n, size, seed);//.Concat(invariantProblems).ToArray();//.Skip(10).Take(6);
+                    Problem.FillrrayOfProblems(problems, n, size, seed);//.Concat(invariantProblems).ToArray();//.Skip(10).Take(6);
                     var results = new ComputationResult[computables.Length][];
                     var computableId = 0;
                     foreach (var computable in computables)

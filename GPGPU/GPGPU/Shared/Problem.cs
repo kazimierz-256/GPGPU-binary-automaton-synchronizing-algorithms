@@ -30,12 +30,14 @@ namespace GPGPU.Shared
             return problem;
         }
 
-        public static Problem[] GetArrayOfProblems(int problemCount, int problemSize, int seed)
+        // TODO: change this to fill arrray of problems
+        public static void FillrrayOfProblems(Problem[] problems, int problemCount, int problemSize, int seed)
         {
             var random = new Random(seed);
-            return Enumerable.Range(0, problemCount).Select(
-                 _ => Problem.GenerateProblem(problemSize, random.Next())
-                 ).ToArray();
+            for (int i = 0; i < problemCount; i++)
+            {
+                problems[i] = GenerateProblem(problemSize, random.Next());
+            }
         }
 
         public static Problem GenerateProblem(int problemSize, int seed)

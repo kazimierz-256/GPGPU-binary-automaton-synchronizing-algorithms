@@ -24,8 +24,8 @@ namespace GPGPU
             var theSolver = new IComputable[]
             {
                 new SlimCPU(),
-                new SlimCPUGPU(),
                 new SlimGPUQueue(),
+                new SlimCPUGPU(),
                 new SuperSlimGPUBreakthrough()
             };
             #endregion
@@ -40,42 +40,72 @@ namespace GPGPU
             {
                 csvBuilder.Append(",").Append(solver.GetType().Name);
             }
-            var resultsDictionary = new List<ComputationResult>();
+            //var resultsDictionary = new List<ComputationResult>();
 
-            var sizeIncrease = Math.Sqrt(Math.Sqrt(Math.Sqrt(Math.Sqrt(2))));
-            var initialProblemSamplingCount = 1 << 14;
-            var maximalProblemCount = 1 << 18;
+            var sizeIncrease = Math.Pow(2, 1d / 8d);
+            var initialProblemSamplingCount = 1 << 15;
+            var maximalProblemCount = 1 << 19;
 
             double doublePrecisionN = initialProblemSamplingCount;
+            var problems = new Problem[0];
             for (int n = (int)doublePrecisionN; n < maximalProblemCount; n = (int)Math.Round(doublePrecisionN *= sizeIncrease))
             //for (int i = 0; i < 10; i++)
             {
+                Console.WriteLine();
+                Console.WriteLine();
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"{n} problems");
+                Console.ResetColor();
+                Console.WriteLine();
+
+                var latestCPUPerformance = TimeSpan.Zero;
+                var latestGPUPerformance = TimeSpan.Zero;
                 csvBuilder.AppendLine();
                 csvBuilder.Append(problemSize).Append(",").Append(n);
+                if (problems.Length != n)
+                {
+                    problems = new Problem[n];
+                    GC.Collect();
+                }
                 foreach (var solver in theSolver)
                 {
                     computeLoopUsing(solver);
                 }
 
-                Console.WriteLine();
-                Console.WriteLine();
                 void computeLoopUsing(IComputable solver)
                 {
-                    var problems = Problem.GetArrayOfProblems(n, problemSize, problemSeed + n);
+                    Problem.FillrrayOfProblems(problems, n, problemSize, problemSeed + n);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
 
+                    void Compute(IComputable localSolver, ComputationResult[] localResults)
+                    {
+                        localSolver.Compute(problems, 0, localResults, 0, problems.Length, localSolver.GetBestParallelism());
+                    }
+
                     var results = new ComputationResult[problems.Length];
+                    if (solver is SlimCPUGPU)
+                    {
+                        ((SlimCPUGPU)solver).SetCPUPart((float)(latestCPUPerformance.TotalMilliseconds / (latestCPUPerformance.TotalMilliseconds + latestGPUPerformance.TotalMilliseconds)));
+                    }
                     watch.Restart();
-                    solver.Compute(problems, 0, results, 0, problems.Length, solver.GetBestParallelism());
+                    Compute(solver, results);
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
-                    var summary = new ComputationResultSummary();
+                    if (solver is SlimCPU)
+                    {
+                        latestCPUPerformance = computationElapsed;
+                    }
+                    else if (solver is SlimGPUQueue)
+                    {
+                        latestGPUPerformance = computationElapsed;
+                    }
+                    //var summary = new ComputationResultSummary();
                     csvBuilder.Append(",").Append(Math.Round(n / computationElapsed.TotalSeconds));
-                    var benchmarkedResults = results.Where(result => result.benchmarkResult != null && result.benchmarkResult.benchmarkedTime != null && result.benchmarkResult.totalTime != null);
-                    var computationToTotalFraction = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
-                        / benchmarkedResults.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
-                    Console.WriteLine(computationToTotalFraction);
+                    //var benchmarkkedResults = results.Where(result => result.benchmarkResult != null && result.benchmarkResult.benchmarkedTime != null && result.benchmarkResult.totalTime != null);
+                    //var computationToTotalFraction = benchmarkedResults.Sum(result => result.benchmarkResult.benchmarkedTime.TotalMilliseconds)
+                    //    / benchmarkedResults.Sum(result => result.benchmarkResult.totalTime.TotalMilliseconds);
+                    //Console.WriteLine(computationToTotalFraction);
                     //watch.Reset();
                     //watch.Start();
                     //if (!(
@@ -94,11 +124,15 @@ namespace GPGPU
 
                     var verificationElapsed = watch.Elapsed;
 
-                    resultsDictionary.AddRange(results);
-
-                    Console.WriteLine($"{solver.GetType().ToString()} {n} problems computed using {solver.GetBestParallelism()} processors in {computationElapsed.TotalMilliseconds:F2}ms. " +
-                        $"Problems per second: {n / computationElapsed.TotalSeconds:F2}. " +
-                        $"Time per problem {computationElapsed.TotalMilliseconds / n}ms");
+                    //resultsDictionary.AddRange(results);
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write(solver.GetType());
+                    Console.ResetColor();
+                    Console.Write($" using {solver.GetBestParallelism()} parallelism in {computationElapsed.TotalMilliseconds:F2}ms. Problems per second: ");
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write($"{n / computationElapsed.TotalSeconds:F2}");
+                    Console.ResetColor();
+                    Console.WriteLine($". Time per problem {computationElapsed.TotalMilliseconds / n}ms");
 
                     //Console.WriteLine($"{n} problems verified using {degreeOfParallelism} processors in {verificationElapsed.TotalMilliseconds:F2}ms. " +
                     //    $"Verifications per second: {n / verificationElapsed.TotalSeconds:F2}. " +
@@ -107,8 +141,8 @@ namespace GPGPU
                     //Console.WriteLine($"Summary: {results.Average(result => result.isSynchronizable ? 1 : 0) * 100:F2}% synchronizability, " +
                     //    $"{results.Where(result => result.isSynchronizable).Average(result => result.shortestSynchronizingWordLength):F2} average length of a synchronizing word");
 
-                    var lessThanOrEqualTo = 10;
-                    Console.WriteLine($"fraction of less or equal to {lessThanOrEqualTo} is {results.Select(result => result.shortestSynchronizingWordLength <= lessThanOrEqualTo ? 1 : 0).Average()}");
+                    //var lessThanOrEqualTo = 10;
+                    //Console.WriteLine($"fraction of less or equal to {lessThanOrEqualTo} is {results.Select(result => result.shortestSynchronizingWordLength <= lessThanOrEqualTo ? 1 : 0).Average()}");
 
                     //#region Histogram
                     //var histogram = results

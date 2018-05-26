@@ -11,11 +11,8 @@ namespace GPGPU
 {
     public class SlimCPUGPU : IComputable
     {
-
+        private float cpuPart = 0.5f;
         public void Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism)
-            => ComputePart(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, degreeOfParallelism);
-
-        public void ComputePart(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism, float cpuPart = .5f)
         {
             int cpuProblems = (int)Math.Round(problemsToSolve.Length * cpuPart);
             var thread = new Thread(() =>
@@ -33,5 +30,6 @@ namespace GPGPU
             thread.Join();
         }
         public int GetBestParallelism() => -1;
+        public void SetCPUPart(float cpuPart) => this.cpuPart = cpuPart;
     }
 }
