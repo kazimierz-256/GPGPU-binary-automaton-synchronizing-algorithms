@@ -43,7 +43,7 @@ namespace GPGPU
             //var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Pow(2, 1d / 8d);
-            var initialProblemSamplingCount = 1 << 15;
+            var initialProblemSamplingCount = 1 << 16;
             var maximalProblemCount = 1 << 19;
 
             double doublePrecisionN = initialProblemSamplingCount;
@@ -65,7 +65,7 @@ namespace GPGPU
                 if (problems.Length != n)
                 {
                     problems = new Problem[n];
-                    GC.Collect();
+                    Problem.FillrrayOfProblems(problems, n, problemSize, problemSeed + n);
                 }
                 foreach (var solver in theSolver)
                 {
@@ -74,7 +74,6 @@ namespace GPGPU
 
                 void computeLoopUsing(IComputable solver)
                 {
-                    Problem.FillrrayOfProblems(problems, n, problemSize, problemSeed + n);
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
 
