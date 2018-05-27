@@ -55,8 +55,8 @@ namespace GPGPU
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            byte localProblemId = 1;
-            var isDiscovered = new byte[powerSetCount];
+            uint localProblemId = 1;
+            var isDiscovered = new uint[powerSetCount];
 
             var queue = new Queue<ushort>(n * 2);
 
@@ -67,7 +67,7 @@ namespace GPGPU
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
-                if (localProblemId == 0)
+                if (localProblemId <= 0)
                 {
                     localProblemId = 1;
                     Array.Clear(isDiscovered, 0, isDiscovered.Length);
