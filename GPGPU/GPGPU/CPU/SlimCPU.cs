@@ -58,7 +58,12 @@ namespace GPGPU
             uint localProblemId = 1;
             var isDiscovered = new uint[powerSetCount];
 
-            var queue = new Queue<ushort>(n * 2);
+            var queue = new ushort[powerSetCount / 2 + 1];
+            var ququeLength = queue.Length;
+            ushort readingIndex = 0;
+            ushort writingIndex = 1;
+            int readingBonus = 0;
+            int writingBonus = 0;
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
@@ -75,8 +80,9 @@ namespace GPGPU
                     //isDiscovered = new byte[powerSetCount];
                 }
                 isDiscovered[initialVertex] = localProblemId;
-                queue.Clear();
-                queue.Enqueue(initialVertex);
+                readingIndex = writingIndex = 0;
+                readingBonus = writingBonus = 0;
+                queue[writingIndex++] = initialVertex;
 
                 var discoveredSingleton = false;
                 ushort consideringVertex;
@@ -95,12 +101,17 @@ namespace GPGPU
                 var verticesUntilBump = ushort.MaxValue;
                 var seekingFirstNext = true;
 
-                while (queue.Count > 0)
+                while (readingBonus < writingBonus || readingIndex < writingIndex)
                 {
                     //if (queue.Count > maximumBreadth)
                     //    maximumBreadth = queue.Count;
 
-                    consideringVertex = queue.Dequeue();
+                    consideringVertex = queue[readingIndex++];
+                    if (readingIndex == ququeLength)
+                    {
+                        readingBonus += ququeLength;
+                        readingIndex = 0;
+                    }
 
                     if (--verticesUntilBump == 0)
                     {
@@ -133,12 +144,17 @@ namespace GPGPU
                         }
 
                         isDiscovered[vertexAfterTransitionA] = localProblemId;
-                        queue.Enqueue(vertexAfterTransitionA);
+                        queue[writingIndex++] = vertexAfterTransitionA;
+                        if (writingIndex == ququeLength)
+                        {
+                            writingBonus += ququeLength;
+                            writingIndex = 0;
+                        }
 
                         if (seekingFirstNext)
                         {
                             seekingFirstNext = false;
-                            verticesUntilBump = (ushort)queue.Count;
+                            verticesUntilBump = (ushort)(writingBonus - readingBonus + writingIndex - readingIndex);
                         }
                     }
 
@@ -151,12 +167,17 @@ namespace GPGPU
                         }
 
                         isDiscovered[vertexAfterTransitionB] = localProblemId;
-                        queue.Enqueue(vertexAfterTransitionB);
+                        queue[writingIndex++] = vertexAfterTransitionB;
+                        if (writingIndex == ququeLength)
+                        {
+                            writingBonus += ququeLength;
+                            writingIndex = 0;
+                        }
 
                         if (seekingFirstNext)
                         {
                             seekingFirstNext = false;
-                            verticesUntilBump = (ushort)queue.Count;
+                            verticesUntilBump = (ushort)(writingBonus - readingBonus + writingIndex - readingIndex);
                         }
                     }
                 }
