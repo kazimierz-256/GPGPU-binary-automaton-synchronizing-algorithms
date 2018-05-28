@@ -68,6 +68,10 @@ namespace GPGPU
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
+
+            ushort consideringVertex;
+            ushort vertexAfterTransitionA;
+            ushort vertexAfterTransitionB;
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
 #if (benchmark)
@@ -85,12 +89,6 @@ namespace GPGPU
                 readingIndex = 0;
                 writingIndex = 1;
 
-                var discoveredSingleton = false;
-                ushort consideringVertex;
-                ushort vertexAfterTransitionA;
-                ushort vertexAfterTransitionB;
-
-
                 for (int i = 0; i < n; i++)
                 {
                     precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixA[i]);
@@ -101,6 +99,7 @@ namespace GPGPU
                 ushort currentNextDistance = 1;
                 var verticesUntilBump = ushort.MaxValue;
                 var seekingFirstNext = true;
+                var discoveredSingleton = false;
 
                 while (readingIndex < writingIndex)
                 {
