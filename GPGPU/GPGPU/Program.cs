@@ -43,8 +43,8 @@ namespace GPGPU
             //var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Pow(2, 1d / 8d);
-            var initialProblemSamplingCount = 1 << 16;
-            var maximalProblemCount = 1 << 19;
+            var initialProblemSamplingCount = 1 << 14;
+            var maximalProblemCount = 1 << 21;
 
             double doublePrecisionN = initialProblemSamplingCount;
             var problems = new Problem[0];

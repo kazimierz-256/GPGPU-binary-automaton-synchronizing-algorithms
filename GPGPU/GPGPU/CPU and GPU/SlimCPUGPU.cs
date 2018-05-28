@@ -17,7 +17,7 @@ namespace GPGPU
             int cpuProblems = (int)Math.Round(problemsToSolve.Length * cpuPart);
             var thread = new Thread(() =>
             {
-                new SlimCPU().Compute(problemsToSolve, 0, computationResults, 0, cpuProblems, Environment.ProcessorCount - 1);
+                new SlimCPU().Compute(problemsToSolve, 0, computationResults, 0, cpuProblems, Environment.ProcessorCount);
             })
             {
                 IsBackground = false
