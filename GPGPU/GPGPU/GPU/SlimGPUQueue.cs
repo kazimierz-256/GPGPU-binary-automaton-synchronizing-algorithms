@@ -76,7 +76,7 @@ namespace GPGPU
 
             gpu.Copy(n, problemSize);
 
-            var isDiscoveredComplexOffset = (power * sizeof(int) + bitSize) / (8 * sizeof(int) / bitSize);
+            var isDiscoveredComplexOffset = (power * sizeof(int) + 8 * sizeof(int) / bitSize - 1) / (8 * sizeof(int) / bitSize);
 
             var launchParameters = new LaunchParam(
                 new dim3(1 << 9, 1, 1),
@@ -231,7 +231,7 @@ namespace GPGPU
             // must be the last among ints
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
-            var complexOffset = (power * sizeof(int) + bitSize) / wordCount;
+            var complexOffset = (power * sizeof(int) + wordCount - 1) / wordCount;
             byteOffset += complexOffset + (((complexOffset % sizeof(int)) & 1) == 1 ? 1 : 0);
 
             var queueEven = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
@@ -333,6 +333,7 @@ namespace GPGPU
 
                         if (0 == (isDiscoveredPtr[vertexAfterTransitionA / wordCount] & (twoToBitsize << isDiscoveredOffset)))
                         {
+                            // should have used AtomicOr (which is not available in AleaGPU - very unfortunate)
                             var beforeAdded = DeviceFunction.AtomicAdd(
                                 isDiscoveredPtr.Ptr(vertexAfterTransitionA / wordCount),
                                 1 << isDiscoveredOffset) & (twoToBitsize << isDiscoveredOffset);
