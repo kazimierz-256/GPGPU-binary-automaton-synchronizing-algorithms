@@ -59,11 +59,11 @@ namespace GPGPU
             var isDiscovered = new uint[powerSetCount];
 
             var queue = new ushort[powerSetCount / 2 + 1];
-            var ququeLength = queue.Length;
+            uint ququeLength = (uint)queue.Length;
             ushort readingIndex = 0;
-            ushort writingIndex = 1;
-            int readingBonus = 0;
-            int writingBonus = 0;
+            ushort writingIndex = 0;
+            uint readingBonus = 0;
+            uint writingBonus = 0;
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];

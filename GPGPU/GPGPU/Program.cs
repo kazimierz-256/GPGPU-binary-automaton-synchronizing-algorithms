@@ -24,9 +24,9 @@ namespace GPGPU
             var theSolver = new IComputable[]
             {
                 new SlimCPU(),
-                //new SlimGPUQueue(),
-                //new SlimCPUGPU(),
-                //new SuperSlimGPUBreakthrough()
+                new SlimGPUQueue(),
+                new SlimCPUGPU(),
+                new SuperSlimGPUBreakthrough()
             };
             #endregion
             Gpu.Default.Device.Print();
@@ -42,9 +42,9 @@ namespace GPGPU
             }
             //var resultsDictionary = new List<ComputationResult>();
 
-            var sizeIncrease = 1;
-            var initialProblemSamplingCount = 1 << 20;
-            var maximalProblemCount = 1 << 24;
+            var sizeIncrease = Math.Pow(2, 1d / 8d);
+            var initialProblemSamplingCount = 1 << 14;
+            var maximalProblemCount = 1 << 21;
 
             double doublePrecisionN = initialProblemSamplingCount;
             var problems = new Problem[0];
