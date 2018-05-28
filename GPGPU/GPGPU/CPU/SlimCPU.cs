@@ -55,15 +55,16 @@ namespace GPGPU
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
+            // CPU has lots of memory, so we can be generous
+
             uint localProblemId = 1;
             var isDiscovered = new uint[powerSetCount];
 
-            var queue = new ushort[powerSetCount / 2 + 1];
-            uint ququeLength = (uint)queue.Length;
+            var queue = new ushort[powerSetCount];
+            // always the same, no need to change this while in a loop
+            queue[0] = initialVertex;
             ushort readingIndex = 0;
             ushort writingIndex = 0;
-            uint readingBonus = 0;
-            uint writingBonus = 0;
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
@@ -72,6 +73,7 @@ namespace GPGPU
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
+                // that's unprobable since 2^32-1 is a very large number of problems
                 if (localProblemId <= 0)
                 {
                     localProblemId = 1;
@@ -80,9 +82,8 @@ namespace GPGPU
                     //isDiscovered = new byte[powerSetCount];
                 }
                 isDiscovered[initialVertex] = localProblemId;
-                readingIndex = writingIndex = 0;
-                readingBonus = writingBonus = 0;
-                queue[writingIndex++] = initialVertex;
+                readingIndex = 0;
+                writingIndex = 1;
 
                 var discoveredSingleton = false;
                 ushort consideringVertex;
@@ -101,17 +102,12 @@ namespace GPGPU
                 var verticesUntilBump = ushort.MaxValue;
                 var seekingFirstNext = true;
 
-                while (readingBonus < writingBonus || readingIndex < writingIndex)
+                while (readingIndex < writingIndex)
                 {
                     //if (queue.Count > maximumBreadth)
                     //    maximumBreadth = queue.Count;
 
                     consideringVertex = queue[readingIndex++];
-                    if (readingIndex == ququeLength)
-                    {
-                        readingBonus += ququeLength;
-                        readingIndex = 0;
-                    }
 
                     if (--verticesUntilBump == 0)
                     {
@@ -145,16 +141,11 @@ namespace GPGPU
 
                         isDiscovered[vertexAfterTransitionA] = localProblemId;
                         queue[writingIndex++] = vertexAfterTransitionA;
-                        if (writingIndex == ququeLength)
-                        {
-                            writingBonus += ququeLength;
-                            writingIndex = 0;
-                        }
 
                         if (seekingFirstNext)
                         {
                             seekingFirstNext = false;
-                            verticesUntilBump = (ushort)(writingBonus - readingBonus + writingIndex - readingIndex);
+                            verticesUntilBump = (ushort)(writingIndex - readingIndex);
                         }
                     }
 
@@ -168,16 +159,11 @@ namespace GPGPU
 
                         isDiscovered[vertexAfterTransitionB] = localProblemId;
                         queue[writingIndex++] = vertexAfterTransitionB;
-                        if (writingIndex == ququeLength)
-                        {
-                            writingBonus += ququeLength;
-                            writingIndex = 0;
-                        }
 
                         if (seekingFirstNext)
                         {
                             seekingFirstNext = false;
-                            verticesUntilBump = (ushort)(writingBonus - readingBonus + writingIndex - readingIndex);
+                            verticesUntilBump = (ushort)(writingIndex - readingIndex);
                         }
                     }
                 }
