@@ -39,10 +39,10 @@ namespace AlgorithmCorrectnessTestProject
         private void AssertOneProblem(Problem problem) => AssertProblems(new[] { problem });
 
         [TestMethod]
-        public void WorstCases3To13()
+        public void WorstCases3To13TripleTimes()
         {
             for (int i = 3; i < 14; i++)
-                AssertOneProblem(Problem.GenerateWorstCase(i));
+                AssertProblems(new[] { Problem.GenerateWorstCase(i), Problem.GenerateWorstCase(i), Problem.GenerateWorstCase(i) });
         }
 
         [TestMethod]
@@ -60,7 +60,7 @@ namespace AlgorithmCorrectnessTestProject
             {
                 foreach (var size in sizes)
                 {
-                    Problem.FillrrayOfProblems(problems, n, size, seed);//.Concat(invariantProblems).ToArray();//.Skip(10).Take(6);
+                    Problem.FillArrayOfProblems(problems, n, size, seed);//.Concat(invariantProblems).ToArray();//.Skip(10).Take(6);
                     var results = new ComputationResult[computables.Length][];
                     var computableId = 0;
                     foreach (var computable in computables)

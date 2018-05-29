@@ -65,7 +65,7 @@ namespace GPGPU
                 if (problems.Length != n)
                 {
                     problems = new Problem[n];
-                    Problem.FillrrayOfProblems(problems, n, problemSize, problemSeed + n);
+                    Problem.FillArrayOfProblems(problems, n, problemSize, problemSeed + n);
                 }
                 foreach (var solver in theSolver)
                 {

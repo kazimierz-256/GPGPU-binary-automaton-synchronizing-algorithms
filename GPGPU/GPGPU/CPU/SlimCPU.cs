@@ -85,13 +85,13 @@ namespace GPGPU
 #endif
 
                 // that's unprobable since 2^32-1 is a very large number of problems
-                if (localProblemId <= 0)
-                {
-                    localProblemId = 1;
-                    Array.Clear(isDiscovered, 0, isDiscovered.Length);
-                    //// should be faster than zeroing out an array
-                    //isDiscovered = new byte[powerSetCount];
-                }
+                //if (localProblemId <= 0)
+                //{
+                //    localProblemId = 1;
+                //    Array.Clear(isDiscovered, 0, isDiscovered.Length);
+                //    //// should be faster than zeroing out an array
+                //    //isDiscovered = new byte[powerSetCount];
+                //}
                 isDiscovered[initialVertex] = localProblemId;
                 readingIndex = 0;
                 writingIndex = 1;
