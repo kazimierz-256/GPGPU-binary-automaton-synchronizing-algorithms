@@ -9,12 +9,13 @@ namespace GPGPU.Interfaces
 {
     public interface IComputable
     {
-        void Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism);
-        int GetBestParallelism();
+        /// <returns>Is Cerny Conjecture false? if yes then return the index of the problem that fails, else return -1</returns>
+        int Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism);
 
-        //void Compute();
-        //IComputable<T> SetProblems(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int problemCount);
-        //IComputable<T> SetDegreeOfParallelism(int degreeOfParallelism);
-        //IComputable<T> SetSpecialArgument(T specialArgument);
+        /// <returns>Is Cerny Conjecture false? if yes then return the index of the problem that fails, else return -1</returns>
+        int Verify(Problem[] problemsToSolve, int problemsReadingIndex, int problemCount, int degreeOfParallelism);
+        /// <returns>Optimal parallelism parameter</returns>
+        int GetBestParallelism();
+        
     }
 }

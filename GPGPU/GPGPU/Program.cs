@@ -43,7 +43,7 @@ namespace GPGPU
             //var resultsDictionary = new List<ComputationResult>();
 
             var sizeIncrease = Math.Pow(2, 1d / 8d);
-            var initialProblemSamplingCount = 1 << 14;
+            var initialProblemSamplingCount = 1 << 17;
             var maximalProblemCount = 1 << 21;
 
             double doublePrecisionN = initialProblemSamplingCount;
@@ -79,7 +79,11 @@ namespace GPGPU
 
                     void Compute(IComputable localSolver, ComputationResult[] localResults)
                     {
-                        localSolver.Compute(problems, 0, localResults, 0, problems.Length, localSolver.GetBestParallelism());
+                        var result = localSolver.Verify(problems, 0, problems.Length, localSolver.GetBestParallelism());
+                        if (result >= 0)
+                        {
+                            throw new Exception($"Cerny Conjecture is false, problem: {problems[result]}");
+                        }
                     }
 
                     var results = new ComputationResult[problems.Length];

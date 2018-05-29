@@ -1,4 +1,4 @@
-﻿#define benchmark
+﻿//#define benchmark
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
@@ -20,7 +20,7 @@ namespace GPGPU
 
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
-        public void Compute(
+        public int Compute(
             Problem[] problemsToSolve,
             int problemsReadingIndex,
             ComputationResult[] computationResults,
@@ -29,7 +29,7 @@ namespace GPGPU
             int streamCount)
             => ComputeAction(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, streamCount);
 
-        public void ComputeAction(
+        public int ComputeAction(
             Problem[] problemsToSolve,
             int problemsReadingIndex,
             ComputationResult[] computationResults,
@@ -44,6 +44,7 @@ namespace GPGPU
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
 #endif
+            var CernyConjectureFailingIndex = -1;
             var gpu = Gpu.Default;
             var n = problemsToSolve[problemsReadingIndex].size;
 
@@ -140,6 +141,12 @@ namespace GPGPU
                 var offset = streamId * problemsPerStream;
                 var localProblemsCount = Math.Min(problemsPerStream, problemCount - offset);
 
+                if (computationResults == null)
+                {
+                    resultsWritingIndex = 0;
+                    computationResults = new ComputationResult[resultsWritingIndex + problemCount];
+                }
+
                 for (int i = 0; i < localProblemsCount; i++)
                 {
                     computationResults[resultsWritingIndex + offset + i].isSynchronizable = gpuResultsIsSynchronizable[streamId][i];
@@ -161,7 +168,7 @@ namespace GPGPU
                 stream.Dispose();
 
             var cpu = new SlimCPUSkipper();
-            cpu.Compute(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, cpu.GetBestParallelism());
+            var result = cpu.Compute(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, cpu.GetBestParallelism());
 
 #if (benchmark)
             computationResults[resultsWritingIndex].benchmarkResult = new BenchmarkResult
@@ -170,6 +177,7 @@ namespace GPGPU
                 totalTime = totalTiming.Elapsed
             };
 #endif
+            return result;
         }
 
         public static void Kernel(
@@ -246,5 +254,9 @@ namespace GPGPU
                 }
             }
         }
+
+
+        public int Verify(Problem[] problemsToSolve, int problemsReadingIndex, int problemCount, int degreeOfParallelism)
+            => Compute(problemsToSolve, problemsReadingIndex, null, -1, problemCount, degreeOfParallelism);
     }
 }

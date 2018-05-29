@@ -26,9 +26,10 @@ namespace AlgorithmCorrectnessTestProject
         }
 
         [TestMethod]
-        public void SmallWorstCase() => CheckWorstCase(3);
-        [TestMethod]
-        public void LargeWorstCase() => CheckWorstCase(13);
-
+        public void WorstCasesFrom3To13()
+        {
+            for (int i = 3; i < 14; i++)
+                CheckWorstCase(i); 
+        }
     }
 }

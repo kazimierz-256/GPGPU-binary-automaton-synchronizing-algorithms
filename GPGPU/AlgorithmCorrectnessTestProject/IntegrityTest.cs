@@ -23,27 +23,27 @@ namespace AlgorithmCorrectnessTestProject
             //new SuperSlimGPUBreakthrough()
         };
 
-        private void AssertOneProblem(Problem problem)
+        private void AssertProblems(Problem[] problems)
         {
             var results = new ComputationResult[computables.Length][];
-            var problems = new[] { problem };
             var computableId = 0;
             foreach (var computable in computables)
             {
-                results[computableId] = new ComputationResult[1];
-                computable.Compute(problems, 0, results[computableId], 0, 1, computable.GetBestParallelism());
+                results[computableId] = new ComputationResult[problems.Length];
+                computable.Compute(problems, 0, results[computableId], 0, problems.Length, computable.GetBestParallelism());
                 computableId++;
             }
 
             AssertSameResults(results, computables, problems);
         }
+        private void AssertOneProblem(Problem problem) => AssertProblems(new[] { problem });
 
         [TestMethod]
-        public void SmallWorstCase() => AssertOneProblem(Problem.GenerateWorstCase(3));
-        [TestMethod]
-        public void MediumWorstCase() => AssertOneProblem(Problem.GenerateWorstCase(7));
-        [TestMethod]
-        public void LargeWorstCase() => AssertOneProblem(Problem.GenerateWorstCase(13));
+        public void WorstCases3To13()
+        {
+            for (int i = 3; i < 14; i++)
+                AssertOneProblem(Problem.GenerateWorstCase(i));
+        }
 
         [TestMethod]
         public void LargeIntegrityCheck()
@@ -51,7 +51,7 @@ namespace AlgorithmCorrectnessTestProject
             var n = 1 << 17;
             // there are issues with multiple sized problems!
             // individually tests pass...
-            // probably this is due to hardcoding problem size during compilation...
+            // probably this is due to hardcoding problem size during JIT compilation
             var sizes = Enumerable.Range(13, 1).ToArray();
             var seeds = Enumerable.Range(12456, 8).ToArray();
 

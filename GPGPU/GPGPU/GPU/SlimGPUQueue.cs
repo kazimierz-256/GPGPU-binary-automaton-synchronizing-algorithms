@@ -20,16 +20,16 @@ namespace GPGPU
 
         private static readonly GlobalVariableSymbol<int> problemSize = Gpu.DefineConstantVariableSymbol<int>();
 
-        public void Compute(
+        public int Compute(
             Problem[] problemsToSolve,
             int problemsReadingIndex,
             ComputationResult[] computationResults,
             int resultsWritingIndex,
             int problemCount,
             int streamCount)
-            => ComputeAction(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, streamCount);
+            => ComputeManyWithAction(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount, streamCount);
 
-        public void ComputeAction(
+        public int ComputeManyWithAction(
             Problem[] problemsToSolve,
             int problemsReadingIndex,
             ComputationResult[] computationResults,
@@ -44,6 +44,7 @@ namespace GPGPU
             totalTiming.Start();
             var benchmarkTiming = new Stopwatch();
 #endif
+            var CernyConjectureFailingIndex = -1;
             var gpu = Gpu.Default;
             var n = problemsToSolve[problemsReadingIndex].size;
 
@@ -170,16 +171,21 @@ namespace GPGPU
 
                 for (int i = 0; i < localProblemsCount; i++)
                 {
-                    computationResults[resultsWritingIndex + offset + i] = new ComputationResult()
-                    {
-                        computationType = ComputationType.GPU,
-                        size = problemsToSolve[problemsReadingIndex].size,
-                        isSynchronizable = gpuResultsIsSynchronizable[stream][i],
-                        shortestSynchronizingWordLength = gpuResultsShortestSynchronizingWordLength[stream][i],
-                        algorithmName = GetType().Name
-                    };
+                    if (computationResults != null)
+                        computationResults[resultsWritingIndex + offset + i] = new ComputationResult()
+                        {
+                            computationType = ComputationType.GPU,
+                            size = problemsToSolve[problemsReadingIndex].size,
+                            isSynchronizable = gpuResultsIsSynchronizable[stream][i],
+                            shortestSynchronizingWordLength = gpuResultsShortestSynchronizingWordLength[stream][i],
+                            algorithmName = GetType().Name
+                        };
+
                     if (gpuResultsIsSynchronizable[stream][i] && gpuResultsShortestSynchronizingWordLength[stream][i] > maximumPermissibleWordLength)
-                        throw new Exception("Cerny conjecture is false");
+                    {
+                        CernyConjectureFailingIndex = resultsWritingIndex + offset + i;
+                        break;
+                    }
                 }
             });
 
@@ -198,6 +204,7 @@ namespace GPGPU
                 totalTime = totalTiming.Elapsed
             };
 #endif
+            return CernyConjectureFailingIndex;
         }
 
         public static void Kernel(
@@ -403,5 +410,8 @@ namespace GPGPU
                 }
             }
         }
+
+        public int Verify(Problem[] problemsToSolve, int problemsReadingIndex, int problemCount, int degreeOfParallelism)
+            => Compute(problemsToSolve, problemsReadingIndex, null, -1, problemCount, degreeOfParallelism);
     }
 }

@@ -14,35 +14,40 @@ namespace GPGPU
     {
         public int GetBestParallelism() => Environment.ProcessorCount;
 
-        public void Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism)
+        /// <returns>True if Cerny conjecture is successfully disproved, results may be incomplete in that case</returns>
+        public int Compute(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount, int degreeOfParallelism)
         {
             if (problemCount == 0)
-                return;
+                return -1;
 
             if (degreeOfParallelism > problemCount)
                 degreeOfParallelism = problemCount;
 
             if (degreeOfParallelism == 1)
             {
-                ComputeMany(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount);
+                return ComputeMany(problemsToSolve, problemsReadingIndex, computationResults, resultsWritingIndex, problemCount);
             }
             else
             {
                 var partition = (problemCount + degreeOfParallelism - 1) / degreeOfParallelism;
+                int CernyConjectureFailingIndex = -1;
                 Parallel.For(0, degreeOfParallelism, i =>
                 {
-                    ComputeMany(
+                    var result = ComputeMany(
                         problemsToSolve,
                         problemsReadingIndex + i * partition,
                         computationResults,
                         resultsWritingIndex + i * partition,
                         Math.Min(partition, problemCount - i * partition)
                         );
+                    if (result >= 0)
+                        CernyConjectureFailingIndex = result;
                 });
+                return CernyConjectureFailingIndex;
             }
         }
 
-        private void ComputeMany(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount)
+        private int ComputeMany(Problem[] problemsToSolve, int problemsReadingIndex, ComputationResult[] computationResults, int resultsWritingIndex, int problemCount)
         {
 #if (benchmark)
             var totalTiming = new Stopwatch();
@@ -55,23 +60,33 @@ namespace GPGPU
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
 
-            byte localProblemId = 1;
-            var isDiscovered = new byte[powerSetCount];
+            // CPU has lots of memory, so we can be generous
 
-            var queue = new Queue<ushort>(n * 2);
+            uint localProblemId = 1;
+            var isDiscovered = new uint[powerSetCount];
+
+            var queue = new ushort[powerSetCount];
+            // always the same, no need to change this while in a loop
+            queue[0] = initialVertex;
+            ushort readingIndex = 0;
+            ushort writingIndex = 0;
 
             var precomputedStateTransitioningMatrixA = new ushort[n];
             var precomputedStateTransitioningMatrixB = new ushort[n];
+
+            ushort consideringVertex;
+            ushort vertexAfterTransitionA;
+            ushort vertexAfterTransitionB;
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
-                if (computationResults[readingId].isSynchronizable)
-                {
-                    continue;
-                }
 #if (benchmark)
                 benchmarkTiming.Start();
 #endif
-                if (localProblemId == 0)
+                if (computationResults != null && computationResults[readingId].isSynchronizable)
+                    continue;
+
+                // that's unprobable since 2^32-1 is a very large number of problems
+                if (localProblemId <= 0)
                 {
                     localProblemId = 1;
                     Array.Clear(isDiscovered, 0, isDiscovered.Length);
@@ -79,14 +94,8 @@ namespace GPGPU
                     //isDiscovered = new byte[powerSetCount];
                 }
                 isDiscovered[initialVertex] = localProblemId;
-                queue.Clear();
-                queue.Enqueue(initialVertex);
-
-                var discoveredSingleton = false;
-                ushort consideringVertex;
-                ushort vertexAfterTransitionA;
-                ushort vertexAfterTransitionB;
-
+                readingIndex = 0;
+                writingIndex = 1;
 
                 for (int i = 0; i < n; i++)
                 {
@@ -98,13 +107,14 @@ namespace GPGPU
                 ushort currentNextDistance = 1;
                 var verticesUntilBump = ushort.MaxValue;
                 var seekingFirstNext = true;
+                var discoveredSingleton = false;
 
-                while (queue.Count > 0)
+                while (readingIndex < writingIndex)
                 {
                     //if (queue.Count > maximumBreadth)
                     //    maximumBreadth = queue.Count;
 
-                    consideringVertex = queue.Dequeue();
+                    consideringVertex = queue[readingIndex++];
 
                     if (--verticesUntilBump == 0)
                     {
@@ -119,7 +129,8 @@ namespace GPGPU
                     // note: consideringVertex cannot ever be equal to 0
 
                     // watch out for the index range in the for loop
-                    for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
+                    ushort mask = 1;
+                    for (byte i = 0; i < n; i++, mask <<= 1)
                     {
                         if (0 != (mask & consideringVertex))
                         {
@@ -137,12 +148,12 @@ namespace GPGPU
                         }
 
                         isDiscovered[vertexAfterTransitionA] = localProblemId;
-                        queue.Enqueue(vertexAfterTransitionA);
+                        queue[writingIndex++] = vertexAfterTransitionA;
 
                         if (seekingFirstNext)
                         {
                             seekingFirstNext = false;
-                            verticesUntilBump = (ushort)queue.Count;
+                            verticesUntilBump = (ushort)(writingIndex - readingIndex);
                         }
                     }
 
@@ -155,12 +166,12 @@ namespace GPGPU
                         }
 
                         isDiscovered[vertexAfterTransitionB] = localProblemId;
-                        queue.Enqueue(vertexAfterTransitionB);
+                        queue[writingIndex++] = vertexAfterTransitionB;
 
                         if (seekingFirstNext)
                         {
                             seekingFirstNext = false;
-                            verticesUntilBump = (ushort)queue.Count;
+                            verticesUntilBump = (ushort)(writingIndex - readingIndex);
                         }
                     }
                 }
@@ -168,25 +179,32 @@ namespace GPGPU
 
                 benchmarkTiming.Stop();
 #endif
-
-                // finished main loop
-
-                computationResults[writingId] = new ComputationResult()
+                if (computationResults == null)
                 {
-                    benchmarkResult = new BenchmarkResult(),
-                    computationType = ComputationType.CPU_Parallel,
-                    //queueBreadth = maximumBreadth,
-                    size = n,
-                    algorithmName = GetType().Name,
-                    isSynchronizable = discoveredSingleton
-                    //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
-                };
-
-                if (discoveredSingleton)
+                    if (discoveredSingleton && currentNextDistance > maximumPermissibleWordLength)
+                        return writingId;
+                }
+                else
                 {
-                    computationResults[writingId].shortestSynchronizingWordLength = currentNextDistance;
-                    if (currentNextDistance > maximumPermissibleWordLength)
-                        throw new Exception("Cerny conjecture is false");
+                    // finished main loop
+
+                    computationResults[writingId] = new ComputationResult()
+                    {
+                        benchmarkResult = new BenchmarkResult(),
+                        computationType = ComputationType.CPU_Parallel,
+                        //queueBreadth = maximumBreadth,
+                        size = n,
+                        algorithmName = GetType().Name,
+                        isSynchronizable = discoveredSingleton
+                        //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
+                    };
+
+                    if (discoveredSingleton)
+                    {
+                        computationResults[writingId].shortestSynchronizingWordLength = currentNextDistance;
+                        if (currentNextDistance > maximumPermissibleWordLength)
+                            return writingId;
+                    }
                 }
 
             }
@@ -194,6 +212,9 @@ namespace GPGPU
             computationResults[resultsWritingIndex].benchmarkResult.benchmarkedTime = benchmarkTiming.Elapsed;
             computationResults[resultsWritingIndex].benchmarkResult.totalTime = totalTiming.Elapsed;
 #endif
+            return -1;
         }
+
+        public int Verify(Problem[] problemsToSolve, int problemsReadingIndex, int problemCount, int degreeOfParallelism) => Compute(problemsToSolve, problemsReadingIndex, null, -1, problemCount, degreeOfParallelism);
     }
 }
