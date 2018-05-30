@@ -19,7 +19,6 @@ namespace Notifications
                 UseDefaultCredentials = false,
                 Credentials = new System.Net.NetworkCredential(email, password),
             };
-            //https://k256.bitbucket.io/cadcam
             var mm = new MailMessage(
                 email,
                 email,
