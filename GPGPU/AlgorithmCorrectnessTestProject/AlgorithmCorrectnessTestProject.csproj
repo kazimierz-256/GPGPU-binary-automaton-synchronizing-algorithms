@@ -70,6 +70,10 @@
       <Project>{C02C48C9-5FBF-42AB-A79A-0D0B7B8CF4AB}</Project>
       <Name>GPGPU</Name>
     </ProjectReference>
+    <ProjectReference Include="..\SharedDefinitions\SharedDefinitions.csproj">
+      <Project>{01df9c6a-8da2-417e-b59f-33134a9f42f9}</Project>
+      <Name>SharedDefinitions</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

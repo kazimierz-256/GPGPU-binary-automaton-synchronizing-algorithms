@@ -59,7 +59,8 @@ namespace GPGPU
             var n = problemsToSolve[problemsReadingIndex].size;
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
-            var maximumPermissibleWordLength = (n - 1) * (n - 1);
+            // HACK: incorrect value
+            var maximumPermissibleWordLength = (n - 1) * (n - 1)/5;
 
             // CPU has lots of memory, so we can be generous
 

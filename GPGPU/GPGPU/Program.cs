@@ -8,7 +8,9 @@ using LinqStatistics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Security;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -29,6 +31,27 @@ namespace GPGPU
                 new SuperSlimGPUBreakthrough()
             };
             #endregion
+
+            #region creditentials
+            var email = string.Empty;
+            var password = new SecureString();
+            Console.WriteLine("Send email notifications? (y/n)");
+            if (Console.ReadKey().KeyChar.ToString().ToLower().Equals("y"))
+            {
+                
+                Console.WriteLine();
+                Console.WriteLine("Please enter notification email: (will send to self)");
+                email = Console.ReadLine();
+                Console.WriteLine($"Please enter the creditentials for the selected email");
+                foreach (var ch in Console.ReadLine())
+                {
+                    password.AppendChar(ch);
+                }
+                Console.Clear();
+                Console.WriteLine("Creditentials saved");
+            }
+            #endregion
+
             Gpu.Default.Device.Print();
             const int problemSeed = 1234567;
             var random = new Random(problemSeed);
@@ -69,20 +92,37 @@ namespace GPGPU
                 }
                 foreach (var solver in theSolver)
                 {
-                    computeLoopUsing(solver);
+                    if (computeLoopUsing(solver))
+                    {
+                        return;
+                    };
                 }
 
-                void computeLoopUsing(IComputable solver)
+                bool computeLoopUsing(IComputable solver)
                 {
                     //var problems = new[] { Problem.GenerateWorstCase(problemSize) };
                     //var problems = Problem.GetArrayOfProblems(16, 3, 123456).Skip(10).Take(6);
 
-                    void Compute(IComputable localSolver, ComputationResult[] localResults)
+                    bool Compute(IComputable localSolver, Problem[] localProblems, ComputationResult[] localResults)
                     {
                         var result = localSolver.Verify(problems, 0, problems.Length, localSolver.GetBestParallelism());
                         if (result >= 0)
                         {
-                            throw new Exception($"Cerny Conjecture is false, problem: {problems[result]}");
+                            File.AppendAllText($@"./cernyFailed.csv", problems[result].ToString());
+
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"Cerny Conjecture is false.");
+                            Console.WriteLine($"Problem description: {problems[result]}");
+                            Console.ResetColor();
+
+                            new Notifications.OpenBrowserTab().Notify(problems[result]);
+                            new Notifications.SendEmail().Notify(problems[result], email, password);
+
+                            return true;
+                        }
+                        else
+                        {
+                            return false;
                         }
                     }
 
@@ -92,7 +132,10 @@ namespace GPGPU
                         ((SlimCPUGPU)solver).SetCPUPart((float)(latestCPUPerformance.TotalMilliseconds / (latestCPUPerformance.TotalMilliseconds + latestGPUPerformance.TotalMilliseconds)));
                     }
                     watch.Restart();
-                    Compute(solver, results);
+                    if (Compute(solver, problems, results))
+                    {
+                        return true;
+                    }
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
                     if (solver is SlimCPU)
@@ -173,6 +216,7 @@ namespace GPGPU
                     System.IO.File.WriteAllText($@"./gpgpu.csv", csvBuilder.ToString());
                     Console.WriteLine();
                     Console.WriteLine();
+                    return false;
                 }
 
 
