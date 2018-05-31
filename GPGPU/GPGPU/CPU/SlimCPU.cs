@@ -78,6 +78,14 @@ namespace GPGPU
             ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
+
+            ushort currentNextDistance;
+            ushort verticesUntilBump;
+            bool seekingFirstNext;
+            bool discoveredSingleton;
+            byte i;
+            ushort mask;
+
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
 #if (benchmark)
@@ -96,17 +104,17 @@ namespace GPGPU
                 readingIndex = 0;
                 writingIndex = 1;
 
-                for (int i = 0; i < n; i++)
+                for (i = 0; i < n; i++)
                 {
                     precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixA[i]);
                     precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixB[i]);
                 }
 
                 //var maximumBreadth = 0;
-                ushort currentNextDistance = 1;
-                var verticesUntilBump = ushort.MaxValue;
-                var seekingFirstNext = true;
-                var discoveredSingleton = false;
+                currentNextDistance = 1;
+                verticesUntilBump = ushort.MaxValue;
+                seekingFirstNext = true;
+                discoveredSingleton = false;
 
                 while (readingIndex < writingIndex)
                 {
@@ -128,8 +136,8 @@ namespace GPGPU
                     // note: consideringVertex cannot ever be equal to 0
 
                     // watch out for the index range in the for loop
-                    ushort mask = 1;
-                    for (byte i = 0; i < n; i++, mask <<= 1)
+                    mask = 1;
+                    for (i = 0; i < n; i++, mask <<= 1)
                     {
                         if (0 != (mask & consideringVertex))
                         {
