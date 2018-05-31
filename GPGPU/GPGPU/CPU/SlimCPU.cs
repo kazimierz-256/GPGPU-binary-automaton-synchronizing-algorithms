@@ -85,7 +85,6 @@ namespace GPGPU
             bool seekingFirstNext;
             bool discoveredSingleton;
             byte i;
-            int mask;
 
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
@@ -107,7 +106,10 @@ namespace GPGPU
 
                 for (i = 0; i < n; i++)
                 {
-                    precomputedStateTransitioningMatrix[i + 1] = (uint)((1 << problemsToSolve[readingId].stateTransitioningMatrixA[i] + n) | (1 << problemsToSolve[readingId].stateTransitioningMatrixB[i]));
+                    precomputedStateTransitioningMatrix[i + 1] = (uint)(
+                        (1 << problemsToSolve[readingId].stateTransitioningMatrixA[i] + n)
+                        | (1 << problemsToSolve[readingId].stateTransitioningMatrixB[i])
+                        );
                 }
 
                 //var maximumBreadth = 0;
@@ -137,8 +139,7 @@ namespace GPGPU
                     // watch out for the index range in the for loop
                     for (i = 1; i <= n; i++, consideringVertex >>= 1)
                     {
-                        mask = i * (1 & consideringVertex);
-                        vertexAfterTransition |= precomputedStateTransitioningMatrix[mask];
+                        vertexAfterTransition |= precomputedStateTransitioningMatrix[i * (1 & consideringVertex)];
                     }
 
                     vertexAfterTransitionA = (ushort)(vertexAfterTransition >> n);

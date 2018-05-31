@@ -26,9 +26,9 @@ namespace GPGPU
             var theSolver = new IComputable[]
             {
                 new SlimCPU(),
-                //new SlimGPUQueue(),
-                //new SlimCPUGPU(),
-                //new SuperSlimGPUBreakthrough()
+                new SlimGPUQueue(),
+                new SlimCPUGPU(),
+                new SuperSlimGPUBreakthrough()
             };
             #endregion
 
