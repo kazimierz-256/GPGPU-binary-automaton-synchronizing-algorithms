@@ -72,19 +72,20 @@ namespace GPGPU
             ushort readingIndex = 0;
             ushort writingIndex = 0;
 
-            var precomputedStateTransitioningMatrixA = new ushort[n];
-            var precomputedStateTransitioningMatrixB = new ushort[n];
+            var precomputedStateTransitioningMatrix = new uint[n + 1];
 
             ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
+            uint vertexAfterTransition;
+            var maskN = (1 << n) - 1;
 
             ushort currentNextDistance;
             ushort verticesUntilBump;
             bool seekingFirstNext;
             bool discoveredSingleton;
             byte i;
-            ushort mask;
+            int mask;
 
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
@@ -106,8 +107,7 @@ namespace GPGPU
 
                 for (i = 0; i < n; i++)
                 {
-                    precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixA[i]);
-                    precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixB[i]);
+                    precomputedStateTransitioningMatrix[i + 1] = (uint)((1 << problemsToSolve[readingId].stateTransitioningMatrixA[i] + n) | (1 << problemsToSolve[readingId].stateTransitioningMatrixB[i]));
                 }
 
                 //var maximumBreadth = 0;
@@ -129,22 +129,20 @@ namespace GPGPU
                         seekingFirstNext = true;
                     }
 
-                    vertexAfterTransitionA = vertexAfterTransitionB = 0;
-
+                    vertexAfterTransition = 0;
                     // check for singleton existance
                     // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                     // note: consideringVertex cannot ever be equal to 0
 
                     // watch out for the index range in the for loop
-                    mask = 1;
-                    for (i = 0; i < n; i++, mask <<= 1)
+                    for (i = 1; i <= n; i++, consideringVertex >>= 1)
                     {
-                        if (0 != (mask & consideringVertex))
-                        {
-                            vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
-                            vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
-                        }
+                        mask = i * (1 & consideringVertex);
+                        vertexAfterTransition |= precomputedStateTransitioningMatrix[mask];
                     }
+
+                    vertexAfterTransitionA = (ushort)(vertexAfterTransition >> n);
+                    vertexAfterTransitionB = (ushort)(vertexAfterTransition & maskN);
 
                     if (localProblemId != isDiscovered[vertexAfterTransitionA])
                     {
