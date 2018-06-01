@@ -1,5 +1,5 @@
 ﻿//#define benchmark
-#define optimizeFor13
+//#define optimizeFor13
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
@@ -242,23 +242,18 @@ namespace GPGPU
                     consideringVertex >>= 4;
                     vertexAfterTransition |= transitionMatrixCombined[48 + (15 & consideringVertex)];
 #else
-                    if (8 < iMax)
+                    if (16 < iMax)
                     {
-                        consideringVertex >>= 3;
-                        vertexAfterTransition |= transitionMatrixCombined[8 + (7 & consideringVertex)];
-                        if (16 < iMax)
+                        consideringVertex >>= 4;
+                        vertexAfterTransition |= transitionMatrixCombined[16 + (15 & consideringVertex)];
+                        if (32 < iMax)
                         {
-                            consideringVertex >>= 3;
-                            vertexAfterTransition |= transitionMatrixCombined[16 + (7 & consideringVertex)];
-                            if (24 < iMax)
+                            consideringVertex >>= 4;
+                            vertexAfterTransition |= transitionMatrixCombined[32 + (15 & consideringVertex)];
+                            if (48 < iMax)
                             {
-                                consideringVertex >>= 3;
-                                vertexAfterTransition |= transitionMatrixCombined[24 + (7 & consideringVertex)];
-                                if (32 < iMax)
-                                {
-                                    consideringVertex >>= 3;
-                                    vertexAfterTransition |= transitionMatrixCombined[32 + (7 & consideringVertex)];
-                                }
+                                consideringVertex >>= 4;
+                                vertexAfterTransition |= transitionMatrixCombined[48 + (15 & consideringVertex)];
                             }
                         }
                     }
