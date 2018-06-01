@@ -1,5 +1,5 @@
 ﻿//#define benchmark
-//#define optimizeFor13
+#define optimizeFor16
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
@@ -215,7 +215,7 @@ namespace GPGPU
                         seekingFirstNext = true;
                     }
 
-                    vertexAfterTransition = 0;
+                    //vertexAfterTransition = 0;
                     // check for singleton existance
                     // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                     // note: consideringVertex cannot ever be equal to 0
@@ -233,15 +233,13 @@ namespace GPGPU
                     //} 
                     #endregion
 
-                    vertexAfterTransition |= transitionMatrixCombined[0 + (15 & consideringVertex)];
-#if (optimizeFor13)
-                    consideringVertex >>= 4;
-                    vertexAfterTransition |= transitionMatrixCombined[16 + (15 & consideringVertex)];
-                    consideringVertex >>= 4;
-                    vertexAfterTransition |= transitionMatrixCombined[32 + (15 & consideringVertex)];
-                    consideringVertex >>= 4;
-                    vertexAfterTransition |= transitionMatrixCombined[48 + (15 & consideringVertex)];
+#if (optimizeFor16)
+                    vertexAfterTransition = transitionMatrixCombined[15 & consideringVertex]
+                    | transitionMatrixCombined[16 + (15 & (consideringVertex >> 4))]
+                    | transitionMatrixCombined[32 + (15 & (consideringVertex >> 8))]
+                    | transitionMatrixCombined[48 + (15 & (consideringVertex >> 12))];
 #else
+                    vertexAfterTransition = transitionMatrixCombined[15 & consideringVertex];
                     if (16 < iMax)
                     {
                         consideringVertex >>= 4;
