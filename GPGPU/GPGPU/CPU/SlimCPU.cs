@@ -88,7 +88,7 @@ namespace GPGPU
             bool seekingFirstNext;
             bool discoveredSingleton;
             byte i, i2;
-            var bits = 3;
+            var bits = 4;
             var twoToPowerBits = (byte)(1 << bits);
             byte iMax = (byte)(twoToPowerBits * ((n + bits - 1) / bits));
 
@@ -121,7 +121,7 @@ namespace GPGPU
                         );
                 }
 
-                for (i = 0, i2 = 0; i < iMax; i += 8, i2 += 6)
+                for (i = 0, i2 = 0; i < iMax; i += 16, i2 += 8)
                 {
                     // first: i == 4 then
                     // tra[1]=pre[1]
@@ -155,23 +155,45 @@ namespace GPGPU
                     //} 
                     #endregion
 
-                    transitionMatrixCombined[i + 0b111]
-                        = transitionMatrixCombined[i + 0b101]
-                        = transitionMatrixCombined[i + 0b011]
-                        = transitionMatrixCombined[i + 0b001]
-                        = precomputedStateTransitioningMatrix[i2 + 0b001];
-                    if (i2 + 0b011 >= n2)
+                    transitionMatrixCombined[i + 0b0001]
+                      = transitionMatrixCombined[i + 0b0011]
+                      = transitionMatrixCombined[i + 0b0101]
+                      = transitionMatrixCombined[i + 0b0111]
+                      = transitionMatrixCombined[i + 0b1001]
+                      = transitionMatrixCombined[i + 0b1011]
+                      = transitionMatrixCombined[i + 0b1101]
+                      = transitionMatrixCombined[i + 0b1111]
+                      = precomputedStateTransitioningMatrix[i2 + 0b0001];
+                    if (i2 + 0b0011 >= n2)
                         break;
-                    transitionMatrixCombined[i + 0b010] = precomputedStateTransitioningMatrix[i2 + 0b011];
-                    transitionMatrixCombined[i + 0b110] = precomputedStateTransitioningMatrix[i2 + 0b011];
-                    transitionMatrixCombined[i + 0b011] |= precomputedStateTransitioningMatrix[i2 + 0b011];
-                    transitionMatrixCombined[i + 0b111] |= precomputedStateTransitioningMatrix[i2 + 0b011];
-                    if (i2 + 0b101 >= n2)
+                    transitionMatrixCombined[i + 0b0010] = precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b0011] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b0110] = precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b0111] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b1010] = precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b1011] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b1110] = precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b1111] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    if (i2 + 0b0101 >= n2)
                         break;
-                    transitionMatrixCombined[i + 0b100] = precomputedStateTransitioningMatrix[i2 + 0b101];
-                    transitionMatrixCombined[i + 0b101] |= precomputedStateTransitioningMatrix[i2 + 0b101];
-                    transitionMatrixCombined[i + 0b110] |= precomputedStateTransitioningMatrix[i2 + 0b101];
-                    transitionMatrixCombined[i + 0b111] |= precomputedStateTransitioningMatrix[i2 + 0b101];
+                    transitionMatrixCombined[i + 0b0100] = precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b0101] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b0110] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b0111] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b1100] = precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b1101] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b1110] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b1111] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    if (i2 + 0b0111 >= n2)
+                        break;
+                    transitionMatrixCombined[i + 0b1000] = precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1001] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1010] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1011] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1100] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1101] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1110] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1111] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
                 }
 
                 //var maximumBreadth = 0;
@@ -211,16 +233,14 @@ namespace GPGPU
                     //} 
                     #endregion
 
-                    vertexAfterTransition |= transitionMatrixCombined[0 + (7 & consideringVertex)];
+                    vertexAfterTransition |= transitionMatrixCombined[0 + (15 & consideringVertex)];
 #if (optimizeFor13)
-                    consideringVertex >>= 3;
-                    vertexAfterTransition |= transitionMatrixCombined[8 + (7 & consideringVertex)];
-                    consideringVertex >>= 3;
-                    vertexAfterTransition |= transitionMatrixCombined[16 + (7 & consideringVertex)];
-                    consideringVertex >>= 3;
-                    vertexAfterTransition |= transitionMatrixCombined[24 + (7 & consideringVertex)];
-                    consideringVertex >>= 3;
-                    vertexAfterTransition |= transitionMatrixCombined[32 + (7 & consideringVertex)];
+                    consideringVertex >>= 4;
+                    vertexAfterTransition |= transitionMatrixCombined[16 + (15 & consideringVertex)];
+                    consideringVertex >>= 4;
+                    vertexAfterTransition |= transitionMatrixCombined[32 + (15 & consideringVertex)];
+                    consideringVertex >>= 4;
+                    vertexAfterTransition |= transitionMatrixCombined[48 + (15 & consideringVertex)];
 #else
                     if (8 < iMax)
                     {
