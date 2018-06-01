@@ -60,7 +60,7 @@ namespace GPGPU
                 gpu.Device.Attributes.MaxThreadsPerBlock,
                 ((1 << bitSize) - 1) - 1
                 );
-            var minimumThreads = 2 * n + 1;
+            var minimumThreads = n + 1;
             if (threads > maximumThreads)
                 threads = maximumThreads;
             if (threads < minimumThreads)
@@ -85,7 +85,7 @@ namespace GPGPU
                 sizeof(int) * 3
                 + isDiscoveredComplexOffset + (((isDiscoveredComplexOffset % sizeof(int)) & 1) == 1 ? 1 : 0)
                 + (power / 2 + 1) * sizeof(ushort) * 2
-                + 2 * n * sizeof(ushort)
+                + (n + 1) * sizeof(uint)
                 + sizeof(bool)
             );
             var gpuResultsIsSynchronizable = new bool[streamCount][];
@@ -235,6 +235,12 @@ namespace GPGPU
                 .Ptr(byteOffset / sizeof(int));
             byteOffset += sizeof(int);
 
+
+            var gpuAB = DeviceFunction.AddressOfArray(__shared__.ExternArray<uint>())
+                .Ptr(byteOffset / sizeof(uint))
+                .Volatile();
+            byteOffset += (n + 1) * sizeof(uint);
+
             // must be the last among ints
             var isDiscoveredPtr = DeviceFunction.AddressOfArray(__shared__.ExternArray<int>())
                 .Ptr(byteOffset / sizeof(int));
@@ -251,17 +257,6 @@ namespace GPGPU
                 .Volatile();
             byteOffset += (power / 2 + 1) * sizeof(ushort);
 
-
-            var gpuA = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(byteOffset / sizeof(ushort))
-                .Volatile();
-            byteOffset += n * sizeof(ushort);
-
-            var gpuB = DeviceFunction.AddressOfArray(__shared__.ExternArray<ushort>())
-                .Ptr(byteOffset / sizeof(ushort))
-                .Volatile();
-            byteOffset += n * sizeof(ushort);
-
             var shouldStop = DeviceFunction.AddressOfArray(__shared__.ExternArray<bool>())
                 .Ptr(byteOffset / sizeof(bool))
                 .Volatile();
@@ -269,15 +264,16 @@ namespace GPGPU
             #endregion
 
             ushort nextDistance;
-            int vertexAfterTransitionA,
-                vertexAfterTransitionB,
-                index;
+            ushort vertexAfterTransitionA,
+                vertexAfterTransitionB;
+            uint vertexAfterTransition;
             var acPart = (arrayCount + gridDim.x - 1) / gridDim.x;
             var acBegin = blockIdx.x * acPart;
             var acEnd = acBegin + acPart;
             if (arrayCount < acEnd)
                 acEnd = arrayCount;
-            index = acBegin * n;
+            var index = acBegin * n;
+            var maskN = (1 << n) - 1;
 
             for (int ac = acBegin; ac < acEnd; ac++, index += n)
             {
@@ -289,14 +285,14 @@ namespace GPGPU
 
                 if (threadIdx.x < n)
                 {
-                    gpuA[threadIdx.x] = (ushort)(1 << precomputedStateTransitioningMatrixA[index + threadIdx.x]);
+                    gpuAB[threadIdx.x + 1] = (uint)(
+                        (1 << (n + precomputedStateTransitioningMatrixA[index + threadIdx.x]))
+                        | (1 << precomputedStateTransitioningMatrixB[index + threadIdx.x])
+                        );
                 }
-                else if (threadIdx.x < (n << 1))
+                else if (threadIdx.x == n)
                 {
-                    gpuB[threadIdx.x - n] = (ushort)(1 << precomputedStateTransitioningMatrixB[index + threadIdx.x - n]);
-                }
-                else if (threadIdx.x == (n << 1) + 1)
-                {
+                    gpuAB[0] = 0;
                     readingQueueIndex[0] = 0;
                     shouldStop[0] = false;
                     queueEvenCount[0] = 0;
@@ -326,15 +322,14 @@ namespace GPGPU
 
                         int consideringVertex = readingQueue[iter];
 
-                        vertexAfterTransitionA = vertexAfterTransitionB = 0;
-                        for (int i = 0, mask = 1; i < n; i++, mask <<= 1)
+                        vertexAfterTransition = 0;
+                        for (int i = 1; i <= n; i++, consideringVertex >>= 1)
                         {
-                            if (0 != (mask & consideringVertex))
-                            {
-                                vertexAfterTransitionA |= gpuA[i];
-                                vertexAfterTransitionB |= gpuB[i];
-                            }
+                            vertexAfterTransition |= gpuAB[i * (1 & consideringVertex)];
                         }
+
+                        vertexAfterTransitionA = (ushort)(vertexAfterTransition >> n);
+                        vertexAfterTransitionB = (ushort)(vertexAfterTransition & maskN);
 
                         var isDiscoveredOffset = (vertexAfterTransitionA % wordCount) * bitSize;
 
