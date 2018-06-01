@@ -44,6 +44,8 @@ namespace AlgorithmCorrectnessTestProject
             for (int i = 3; i < 14; i++)
                 AssertProblems(new[] { Problem.GenerateWorstCase(i), Problem.GenerateWorstCase(i), Problem.GenerateWorstCase(i) });
         }
+        [TestMethod]
+        public void WorstCase13TripleTimes() => AssertProblems(new[] { Problem.GenerateWorstCase(13), Problem.GenerateWorstCase(13), Problem.GenerateWorstCase(13) });
 
         [TestMethod]
         public void LargeIntegrityCheck()
