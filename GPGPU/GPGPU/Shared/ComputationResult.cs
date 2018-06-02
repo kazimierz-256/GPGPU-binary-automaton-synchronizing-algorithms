@@ -16,6 +16,6 @@ namespace GPGPU.Shared
         public ComputationType computationType;
         public int size;
         public int discoveredVertices;
-        internal string algorithmName;
+        public string algorithmName;
     }
 }

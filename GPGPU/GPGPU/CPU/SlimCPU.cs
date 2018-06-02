@@ -91,9 +91,10 @@ namespace GPGPU
             var bits = 4;
             var twoToPowerBits = (byte)(1 << bits);
             byte iMax = (byte)(twoToPowerBits * ((n + bits - 1) / bits));
+            uint tmpTransition;
 
             var precomputedStateTransitioningMatrix = new uint[2 * n];
-            var transitionMatrixCombined = new uint[iMax + twoToPowerBits];
+            var transitionMatrixCombined = new uint[iMax];
 
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
@@ -113,10 +114,10 @@ namespace GPGPU
                 readingIndex = 0;
                 writingIndex = 1;
 
-                for (i = 0; i < n; i++)
+                for (i = 0, i2 = 1; i < n; i++, i2 += 2)
                 {
-                    precomputedStateTransitioningMatrix[2 * i + 1] = (uint)(
-                        (1 << problemsToSolve[readingId].stateTransitioningMatrixA[i] + n)
+                    precomputedStateTransitioningMatrix[i2] = (uint)(
+                        (powerSetCount << problemsToSolve[readingId].stateTransitioningMatrixA[i])
                         | (1 << problemsToSolve[readingId].stateTransitioningMatrixB[i])
                         );
                 }
@@ -166,34 +167,37 @@ namespace GPGPU
                       = precomputedStateTransitioningMatrix[i2 + 0b0001];
                     if (i2 + 0b0011 >= n2)
                         break;
-                    transitionMatrixCombined[i + 0b0010] = precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b0011] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b0110] = precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b0111] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b1010] = precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b1011] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b1110] = precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b1111] |= precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    tmpTransition = precomputedStateTransitioningMatrix[i2 + 0b0011];
+                    transitionMatrixCombined[i + 0b0010] = tmpTransition;
+                    transitionMatrixCombined[i + 0b0011] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b0110] = tmpTransition;
+                    transitionMatrixCombined[i + 0b0111] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1010] = tmpTransition;
+                    transitionMatrixCombined[i + 0b1011] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1110] = tmpTransition;
+                    transitionMatrixCombined[i + 0b1111] |= tmpTransition;
                     if (i2 + 0b0101 >= n2)
                         break;
-                    transitionMatrixCombined[i + 0b0100] = precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b0101] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b0110] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b0111] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b1100] = precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b1101] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b1110] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b1111] |= precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    tmpTransition = precomputedStateTransitioningMatrix[i2 + 0b0101];
+                    transitionMatrixCombined[i + 0b0100] = tmpTransition;
+                    transitionMatrixCombined[i + 0b0101] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b0110] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b0111] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1100] = tmpTransition;
+                    transitionMatrixCombined[i + 0b1101] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1110] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1111] |= tmpTransition;
                     if (i2 + 0b0111 >= n2)
                         break;
-                    transitionMatrixCombined[i + 0b1000] = precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1001] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1010] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1011] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1100] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1101] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1110] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1111] |= precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    tmpTransition = precomputedStateTransitioningMatrix[i2 + 0b0111];
+                    transitionMatrixCombined[i + 0b1000] = tmpTransition;
+                    transitionMatrixCombined[i + 0b1001] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1010] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1011] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1100] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1101] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1110] |= tmpTransition;
+                    transitionMatrixCombined[i + 0b1111] |= tmpTransition;
                 }
 
                 //var maximumBreadth = 0;
