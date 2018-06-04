@@ -23,7 +23,7 @@ namespace Notifications
                 email,
                 email,
                 "Cerny Cojecture",
-                $@"This automata violates Cerny's conjecture: <a href='https://k256.bitbucket.io/cadcam/index.html?a="
+                $@"The following automaton violates Cerny's conjecture: <a href='https://k256.bitbucket.io/cadcam/index.html?a="
                     + problem.ToString()
                     + $"' target='_blank'>{problem.ToString()}</a>"
                 )
