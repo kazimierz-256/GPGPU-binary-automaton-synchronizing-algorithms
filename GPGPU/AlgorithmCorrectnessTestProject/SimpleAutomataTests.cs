@@ -10,7 +10,7 @@ namespace AlgorithmCorrectnessTestProject
     [TestClass]
     public class SimpleAutomataTests
     {
-        private IComputable GetLatestComputingUnit() => new SlimCPU();
+        private IComputable GetLatestComputingUnit() => new SlimCPU4bits();
         private void CheckWorstCase(int n)
         {
             var problem = Problem.GenerateWorstCase(n);

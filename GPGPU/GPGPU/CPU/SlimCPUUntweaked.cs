@@ -1,5 +1,4 @@
 ﻿//#define benchmark
-#define optimizeFor16
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
@@ -12,7 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 namespace GPGPU
 {
-    public class SlimCPU : IComputable
+    public class SlimCPUUntweaked : IComputable
     {
         public int GetBestParallelism() => Environment.ProcessorCount;
 
@@ -58,9 +57,6 @@ namespace GPGPU
 #endif
 
             var n = problemsToSolve[problemsReadingIndex].size;
-            var n2 = (byte)(n << 1);
-            var n2m1 = (byte)(n2 - 1);
-            var n4 = (byte)(n << 2);
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
@@ -76,25 +72,19 @@ namespace GPGPU
             ushort readingIndex = 0;
             ushort writingIndex = 0;
 
+            var precomputedStateTransitioningMatrixA = new ushort[n];
+            var precomputedStateTransitioningMatrixB = new ushort[n];
 
             ushort consideringVertex;
             ushort vertexAfterTransitionA;
             ushort vertexAfterTransitionB;
-            uint vertexAfterTransition;
-            var maskN = (1 << n) - 1;
 
             ushort currentNextDistance;
             ushort verticesUntilBump;
             bool seekingFirstNext;
             bool discoveredSingleton;
-            byte i, i2;
-            var bits = 4;
-            var twoToPowerBits = (byte)(1 << bits);
-            byte iMax = (byte)(twoToPowerBits * ((n + bits - 1) / bits));
-            uint tmpTransition;
-
-            var precomputedStateTransitioningMatrix = new uint[2 * n];
-            var transitionMatrixCombined = new uint[iMax];
+            byte i;
+            ushort mask;
 
             for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
             {
@@ -114,90 +104,10 @@ namespace GPGPU
                 readingIndex = 0;
                 writingIndex = 1;
 
-                for (i = 0, i2 = 1; i < n; i++, i2 += 2)
+                for (i = 0; i < n; i++)
                 {
-                    precomputedStateTransitioningMatrix[i2] = (uint)(
-                        (powerSetCount << problemsToSolve[readingId].stateTransitioningMatrixA[i])
-                        | (1 << problemsToSolve[readingId].stateTransitioningMatrixB[i])
-                        );
-                }
-
-                for (i = 0, i2 = 0; i < iMax; i += 16, i2 += 8)
-                {
-                    // first: i == 4 then
-                    // tra[1]=pre[1]
-                    // tra[2]=pre[3]
-                    // tra[3]=pre[1]|pre[3]
-                    // tra[4]=pre[5]
-                    // tra[5]=pre[5]|pre[1]
-                    // tra[6]=pre[5]|pre[3]
-                    // tra[7]=pre[5]|pre[3]|pre[1]
-
-                    // tra[9]=pre[7]
-                    // tra[10]=pre[9]
-                    // tra[11]=pre[7]|pre[9]
-
-                    #region fullyAutomated_yet_inefficient
-                    //for (int k = 1; k < twoToPowerBits; k++)
-                    //{
-                    //    var tmp = 0u;
-                    //    for (int b = 0, kreduced = k; b < bits; b++, kreduced >>= 1)
-                    //    {
-                    //        if (i2 + 1 + 2 * b < n2)
-                    //        {
-                    //            tmp |= precomputedStateTransitioningMatrix[i2 + (kreduced & 1) + 2 * b];
-                    //        }
-                    //        else
-                    //        {
-                    //            break;
-                    //        }
-                    //    }
-                    //    transitionMatrixCombined[i + k] = tmp;
-                    //} 
-                    #endregion
-
-                    transitionMatrixCombined[i + 0b0001]
-                      = transitionMatrixCombined[i + 0b0011]
-                      = transitionMatrixCombined[i + 0b0101]
-                      = transitionMatrixCombined[i + 0b0111]
-                      = transitionMatrixCombined[i + 0b1001]
-                      = transitionMatrixCombined[i + 0b1011]
-                      = transitionMatrixCombined[i + 0b1101]
-                      = transitionMatrixCombined[i + 0b1111]
-                      = precomputedStateTransitioningMatrix[i2 + 0b0001];
-                    if (i2 + 0b0011 >= n2)
-                        break;
-                    tmpTransition = precomputedStateTransitioningMatrix[i2 + 0b0011];
-                    transitionMatrixCombined[i + 0b0010] = tmpTransition;
-                    transitionMatrixCombined[i + 0b0011] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b0110] = tmpTransition;
-                    transitionMatrixCombined[i + 0b0111] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1010] = tmpTransition;
-                    transitionMatrixCombined[i + 0b1011] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1110] = tmpTransition;
-                    transitionMatrixCombined[i + 0b1111] |= tmpTransition;
-                    if (i2 + 0b0101 >= n2)
-                        break;
-                    tmpTransition = precomputedStateTransitioningMatrix[i2 + 0b0101];
-                    transitionMatrixCombined[i + 0b0100] = tmpTransition;
-                    transitionMatrixCombined[i + 0b0101] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b0110] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b0111] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1100] = tmpTransition;
-                    transitionMatrixCombined[i + 0b1101] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1110] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1111] |= tmpTransition;
-                    if (i2 + 0b0111 >= n2)
-                        break;
-                    tmpTransition = precomputedStateTransitioningMatrix[i2 + 0b0111];
-                    transitionMatrixCombined[i + 0b1000] = tmpTransition;
-                    transitionMatrixCombined[i + 0b1001] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1010] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1011] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1100] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1101] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1110] |= tmpTransition;
-                    transitionMatrixCombined[i + 0b1111] |= tmpTransition;
+                    precomputedStateTransitioningMatrixA[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixA[i]);
+                    precomputedStateTransitioningMatrixB[i] = (ushort)(1 << problemsToSolve[readingId].stateTransitioningMatrixB[i]);
                 }
 
                 //var maximumBreadth = 0;
@@ -219,49 +129,22 @@ namespace GPGPU
                         seekingFirstNext = true;
                     }
 
-                    //vertexAfterTransition = 0;
+                    vertexAfterTransitionA = vertexAfterTransitionB = 0;
+
                     // check for singleton existance
                     // b && !(b & (b-1)) https://stackoverflow.com/questions/12483843/test-if-a-bitboard-have-only-one-bit-set-to-1
                     // note: consideringVertex cannot ever be equal to 0
 
                     // watch out for the index range in the for loop
-                    //for (i = 0; i < n2; i += 2, consideringVertex >>= 1)
-                    //{
-                    //    vertexAfterTransition |= precomputedStateTransitioningMatrix[i + (1 & consideringVertex)];
-                    //}
-
-                    #region fully_automated
-                    //for (i = 0; i < iMax; i += twoToPowerBits, consideringVertex >>= bits)
-                    //{
-                    //    vertexAfterTransition |= transitionMatrixCombined[i + (mask & consideringVertex)];
-                    //} 
-                    #endregion
-
-#if (optimizeFor16)
-                    vertexAfterTransition = transitionMatrixCombined[15 & consideringVertex]
-                    | transitionMatrixCombined[16 + (15 & (consideringVertex >> 4))]
-                    | transitionMatrixCombined[32 + (15 & (consideringVertex >> 8))]
-                    | transitionMatrixCombined[48 + (15 & (consideringVertex >> 12))];
-#else
-                    vertexAfterTransition = transitionMatrixCombined[15 & consideringVertex];
-                    if (16 < iMax)
+                    mask = 1;
+                    for (i = 0; i < n; i++, mask <<= 1)
                     {
-                        consideringVertex >>= 4;
-                        vertexAfterTransition |= transitionMatrixCombined[16 + (15 & consideringVertex)];
-                        if (32 < iMax)
+                        if (0 != (mask & consideringVertex))
                         {
-                            consideringVertex >>= 4;
-                            vertexAfterTransition |= transitionMatrixCombined[32 + (15 & consideringVertex)];
-                            if (48 < iMax)
-                            {
-                                consideringVertex >>= 4;
-                                vertexAfterTransition |= transitionMatrixCombined[48 + (15 & consideringVertex)];
-                            }
+                            vertexAfterTransitionA |= precomputedStateTransitioningMatrixA[i];
+                            vertexAfterTransitionB |= precomputedStateTransitioningMatrixB[i];
                         }
                     }
-#endif
-                    vertexAfterTransitionA = (ushort)(vertexAfterTransition >> n);
-                    vertexAfterTransitionB = (ushort)(vertexAfterTransition & maskN);
 
                     if (localProblemId != isDiscovered[vertexAfterTransitionA])
                     {

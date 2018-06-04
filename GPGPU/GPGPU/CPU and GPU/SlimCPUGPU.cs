@@ -19,7 +19,7 @@ namespace GPGPU
             var CernyConjectureFailingIndex = -1;
             var thread = new Thread(() =>
             {
-                var result = new SlimCPU().Compute(problemsToSolve, 0, computationResults, 0, cpuProblems, Environment.ProcessorCount);
+                var result = new SlimCPU4bits().Compute(problemsToSolve, 0, computationResults, 0, cpuProblems, Environment.ProcessorCount);
                 if (result >= 0)
                     Interlocked.CompareExchange(ref CernyConjectureFailingIndex, result, -1);
             })

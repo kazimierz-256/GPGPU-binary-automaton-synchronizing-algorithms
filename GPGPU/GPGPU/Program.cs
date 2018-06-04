@@ -25,7 +25,10 @@ namespace GPGPU
             const int problemSize = 13;
             var theSolver = new IComputable[]
             {
-                new SlimCPU(),
+                new SlimCPU4bits(),
+                new SlimCPU5bits(),
+                new SlimCPUCoalesced(),
+                new SlimCPUUntweaked(),
                 //new SlimGPUQueue(),
                 //new SlimCPUGPU(),
                 //new SuperSlimGPUBreakthrough()
@@ -52,7 +55,7 @@ namespace GPGPU
             }
             #endregion
 
-            Gpu.Default.Device.Print();
+            //Gpu.Default.Device.Print();
             const int problemSeed = 1234567;
             var random = new Random(problemSeed);
             var watch = new Stopwatch();
@@ -138,7 +141,7 @@ namespace GPGPU
                     }
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
-                    if (solver is SlimCPU)
+                    if (solver is SlimCPU4bits)
                     {
                         latestCPUPerformance = computationElapsed;
                     }

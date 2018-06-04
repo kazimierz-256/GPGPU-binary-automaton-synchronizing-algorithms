@@ -17,7 +17,10 @@ namespace AlgorithmCorrectnessTestProject
     {
         private IComputable[] computables = new IComputable[]
         {
-            new SlimCPU(),
+            new SlimCPU4bits(),
+            new SlimCPU5bits(),
+            new SlimCPUUntweaked(),
+            //new SlimCPUCoalesced(),
             new SlimGPUQueue(),
             new SlimCPUGPU(),
             //new SuperSlimGPUBreakthrough()
@@ -39,13 +42,24 @@ namespace AlgorithmCorrectnessTestProject
         private void AssertOneProblem(Problem problem) => AssertProblems(new[] { problem });
 
         [TestMethod]
-        public void WorstCases3To13TripleTimes()
+        public void WorstCases3To13ThreeTimes()
         {
             for (int i = 3; i < 14; i++)
                 AssertProblems(new[] { Problem.GenerateWorstCase(i), Problem.GenerateWorstCase(i), Problem.GenerateWorstCase(i) });
         }
         [TestMethod]
-        public void WorstCase13TripleTimes() => AssertProblems(new[] { Problem.GenerateWorstCase(13), Problem.GenerateWorstCase(13), Problem.GenerateWorstCase(13) });
+        public void WorstCase13ThreeTimes() => AssertProblems(new[] { Problem.GenerateWorstCase(13), Problem.GenerateWorstCase(13), Problem.GenerateWorstCase(13) });
+
+        [TestMethod]
+        public void WorstCase13SixteenTimes()
+        {
+            var problems = new Problem[16];
+            for (int i = 0; i < problems.Length; i++)
+            {
+                problems[i] = Problem.GenerateWorstCase(13);
+            }
+            AssertProblems(problems);
+        }
 
         [TestMethod]
         public void LargeIntegrityCheck()
