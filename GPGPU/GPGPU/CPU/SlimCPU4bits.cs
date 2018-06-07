@@ -1,5 +1,7 @@
 ﻿//#define benchmark
 //#define optimizeFor16
+#define ignoreOutputArray
+#define makeNconstant13
 using GPGPU.Interfaces;
 using GPGPU.Shared;
 using System;
@@ -12,7 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 namespace GPGPU
 {
-    public class SlimCPU4bits : IComputable
+    public class SlimCPU4bits13 : IComputable
     {
         public int GetBestParallelism() => Environment.ProcessorCount;
 
@@ -57,10 +59,13 @@ namespace GPGPU
             var benchmarkTiming = new Stopwatch();
 #endif
 
+#if (makeNconstant13)
+            const int n = 13;
+#else
             var n = problemsToSolve[problemsReadingIndex].size;
+#endif
             var n2 = (byte)(n << 1);
             var n2m1 = (byte)(n2 - 1);
-            var n4 = (byte)(n << 2);
             var powerSetCount = 1 << n;
             var initialVertex = (ushort)(powerSetCount - 1);
             var maximumPermissibleWordLength = (n - 1) * (n - 1);
@@ -88,7 +93,7 @@ namespace GPGPU
             bool seekingFirstNext;
             bool discoveredSingleton;
             byte i, i2;
-            var bits = 4;
+            const byte bits = 4;
             var twoToPowerBits = (byte)(1 << bits);
             byte iMax = (byte)(twoToPowerBits * ((n + bits - 1) / bits));
             uint tmpTransition;
@@ -96,7 +101,7 @@ namespace GPGPU
             var precomputedStateTransitioningMatrix = new uint[2 * n];
             var transitionMatrixCombined = new uint[iMax];
 
-            for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId++, localProblemId++, readingId++, writingId++)
+            for (int problemId = 0, readingId = problemsReadingIndex, writingId = resultsWritingIndex; problemId < problemCount; problemId += 1, localProblemId += 1, readingId += 1, writingId += 1)
             {
 #if (benchmark)
                 benchmarkTiming.Start();
@@ -114,7 +119,7 @@ namespace GPGPU
                 readingIndex = 0;
                 writingIndex = 1;
 
-                for (i = 0, i2 = 1; i < n; i++, i2 += 2)
+                for (i = 0, i2 = 1; i < n; i += 1, i2 += 2)
                 {
                     precomputedStateTransitioningMatrix[i2] = (uint)(
                         (powerSetCount << problemsToSolve[readingId].stateTransitioningMatrixA[i])
@@ -138,10 +143,10 @@ namespace GPGPU
                     // tra[11]=pre[7]|pre[9]
 
                     #region fullyAutomated_yet_inefficient
-                    //for (int k = 1; k < twoToPowerBits; k++)
+                    //for (int k = 1; k < twoToPowerBits; k+=1)
                     //{
                     //    var tmp = 0u;
-                    //    for (int b = 0, kreduced = k; b < bits; b++, kreduced >>= 1)
+                    //    for (int b = 0, kreduced = k; b < bits; b+=1, kreduced >>= 1)
                     //    {
                     //        if (i2 + 1 + 2 * b < n2)
                     //        {
@@ -211,11 +216,12 @@ namespace GPGPU
                     //if (queue.Count > maximumBreadth)
                     //    maximumBreadth = queue.Count;
 
-                    consideringVertex = queue[readingIndex++];
+                    consideringVertex = queue[readingIndex];
+                    readingIndex += 1;
 
-                    if (--verticesUntilBump == 0)
+                    if ((verticesUntilBump -= 1) == 0)
                     {
-                        ++currentNextDistance;
+                        currentNextDistance += 1;
                         seekingFirstNext = true;
                     }
 
@@ -246,16 +252,13 @@ namespace GPGPU
                     vertexAfterTransition = transitionMatrixCombined[15 & consideringVertex];
                     if (16 < iMax)
                     {
-                        consideringVertex >>= 4;
-                        vertexAfterTransition |= transitionMatrixCombined[16 + (15 & consideringVertex)];
+                        vertexAfterTransition |= transitionMatrixCombined[16 + (15 & (consideringVertex >> 4))];
                         if (32 < iMax)
                         {
-                            consideringVertex >>= 4;
-                            vertexAfterTransition |= transitionMatrixCombined[32 + (15 & consideringVertex)];
+                            vertexAfterTransition |= transitionMatrixCombined[32 + (15 & (consideringVertex >> 8))];
                             if (48 < iMax)
                             {
-                                consideringVertex >>= 4;
-                                vertexAfterTransition |= transitionMatrixCombined[48 + (15 & consideringVertex)];
+                                vertexAfterTransition |= transitionMatrixCombined[48 + (15 & (consideringVertex >> 12))];
                             }
                         }
                     }
@@ -272,7 +275,8 @@ namespace GPGPU
                         }
 
                         isDiscovered[vertexAfterTransitionA] = localProblemId;
-                        queue[writingIndex++] = vertexAfterTransitionA;
+                        queue[writingIndex] = vertexAfterTransitionA;
+                        writingIndex += 1;
 
                         if (seekingFirstNext)
                         {
@@ -290,7 +294,8 @@ namespace GPGPU
                         }
 
                         isDiscovered[vertexAfterTransitionB] = localProblemId;
-                        queue[writingIndex++] = vertexAfterTransitionB;
+                        queue[writingIndex] = vertexAfterTransitionB;
+                        writingIndex += 1;
 
                         if (seekingFirstNext)
                         {
@@ -303,33 +308,33 @@ namespace GPGPU
 
                 benchmarkTiming.Stop();
 #endif
-                if (computationResults == null)
+
+#if (ignoreOutputArray)
+                if (discoveredSingleton && currentNextDistance > maximumPermissibleWordLength)
+                    return writingId;
+#else
+
+                // finished main loop
+
+                computationResults[writingId] = new ComputationResult()
                 {
-                    if (discoveredSingleton && currentNextDistance > maximumPermissibleWordLength)
+                    benchmarkResult = new BenchmarkResult(),
+                    computationType = ComputationType.CPU_Parallel,
+                    //queueBreadth = maximumBreadth,
+                    size = n,
+                    algorithmName = GetType().Name,
+                    isSynchronizable = discoveredSingleton
+                    //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
+                };
+
+                if (discoveredSingleton)
+                {
+                    computationResults[writingId].shortestSynchronizingWordLength = currentNextDistance;
+                    if (currentNextDistance > maximumPermissibleWordLength)
                         return writingId;
                 }
-                else
-                {
-                    // finished main loop
 
-                    computationResults[writingId] = new ComputationResult()
-                    {
-                        benchmarkResult = new BenchmarkResult(),
-                        computationType = ComputationType.CPU_Parallel,
-                        //queueBreadth = maximumBreadth,
-                        size = n,
-                        algorithmName = GetType().Name,
-                        isSynchronizable = discoveredSingleton
-                        //discoveredVertices = isDiscovered.Sum(vertex => vertex ? 1 : 0)
-                    };
-
-                    if (discoveredSingleton)
-                    {
-                        computationResults[writingId].shortestSynchronizingWordLength = currentNextDistance;
-                        if (currentNextDistance > maximumPermissibleWordLength)
-                            return writingId;
-                    }
-                }
+#endif
 
             }
 #if (benchmark)

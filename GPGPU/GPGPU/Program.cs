@@ -25,7 +25,7 @@ namespace GPGPU
             const int problemSize = 13;
             var theSolver = new IComputable[]
             {
-                new SlimCPU4bits(),
+                new SlimCPU4bits13(),
                 new SlimCPU5bits(),
                 new SlimCPUCoalesced(),
                 new SlimCPUUntweaked(),
@@ -41,7 +41,7 @@ namespace GPGPU
             Console.WriteLine("Send email notifications? (y/n)");
             if (Console.ReadKey().KeyChar.ToString().ToLower().Equals("y"))
             {
-                
+
                 Console.WriteLine();
                 Console.WriteLine("Please enter notification email: (will send to self)");
                 email = Console.ReadLine();
@@ -141,7 +141,7 @@ namespace GPGPU
                     }
                     watch.Stop();
                     var computationElapsed = watch.Elapsed;
-                    if (solver is SlimCPU4bits)
+                    if (solver is SlimCPU4bits13)
                     {
                         latestCPUPerformance = computationElapsed;
                     }

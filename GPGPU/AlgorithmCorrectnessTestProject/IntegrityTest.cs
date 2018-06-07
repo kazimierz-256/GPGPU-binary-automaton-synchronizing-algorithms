@@ -17,7 +17,7 @@ namespace AlgorithmCorrectnessTestProject
     {
         private IComputable[] computables = new IComputable[]
         {
-            new SlimCPU4bits(),
+            new SlimCPU4bits13(),
             new SlimCPU5bits(),
             new SlimCPUUntweaked(),
             //new SlimCPUCoalesced(),
