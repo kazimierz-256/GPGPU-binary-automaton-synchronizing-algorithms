@@ -22,13 +22,13 @@ namespace GPGPU
         {
 
             #region Program definitions
-            const int problemSize = 13;
+            const int problemSize = 12;
             var theSolver = new IComputable[]
             {
                 new SlimCPU4bits13(),
-                new SlimCPU5bits(),
-                new SlimCPUCoalesced(),
-                new SlimCPUUntweaked(),
+                //new SlimCPU5bits(),
+                //new SlimCPUCoalesced(),
+                //new SlimCPUUntweaked(),
                 //new SlimGPUQueue(),
                 //new SlimCPUGPU(),
                 //new SuperSlimGPUBreakthrough()
@@ -108,7 +108,7 @@ namespace GPGPU
 
                     bool Compute(IComputable localSolver, Problem[] localProblems, ComputationResult[] localResults)
                     {
-                        var result = localSolver.Verify(problems, 0, problems.Length, localSolver.GetBestParallelism());
+                        var result = localSolver.Verify(problems, 0, problems.Length, 1);
                         if (result >= 0)
                         {
                             File.AppendAllText($@"./cernyFailed.csv", problems[result].ToString());

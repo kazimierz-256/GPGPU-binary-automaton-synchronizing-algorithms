@@ -60,7 +60,7 @@ namespace GPGPU
 #endif
 
 #if (makeNconstant13)
-            const int n = 13;
+            const int n = 12;
 #else
             var n = problemsToSolve[problemsReadingIndex].size;
 #endif
