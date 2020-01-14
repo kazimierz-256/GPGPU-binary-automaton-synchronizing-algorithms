@@ -108,7 +108,7 @@ namespace GPGPU
 
                     bool Compute(IComputable localSolver, Problem[] localProblems, ComputationResult[] localResults)
                     {
-                        var result = localSolver.Verify(problems, 0, problems.Length, 1);
+                        var result = localSolver.Verify(problems, 0, problems.Length, localSolver.GetBestParallelism());
                         if (result >= 0)
                         {
                             File.AppendAllText($@"./cernyFailed.csv", problems[result].ToString());
